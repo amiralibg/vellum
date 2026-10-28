@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Documents · Vellum</title>
+    <link rel="stylesheet" href="assets/vellum.css" />
+    <style>
+      .head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: var(--s-6);
+        flex-wrap: wrap;
+      }
+      .head h1 {
+        font-size: var(--text-h1);
+      }
+      .head .summary {
+        margin-top: var(--s-3);
+        color: var(--color-text-secondary);
+        font-size: var(--text-body);
+      }
+
+      .drop {
+        display: flex;
+        align-items: center;
+        gap: var(--s-4);
+        margin: var(--s-10) 0 var(--s-8);
+        padding: var(--s-5) var(--s-6);
+        border: 1px dashed var(--color-line-strong);
+        border-radius: var(--r);
+        transition: background-color 120ms ease-out, border-color 120ms ease-out;
+      }
+      .drop.is-over {
+        background: var(--color-surface);
+        border-color: var(--color-ink);
+      }
+      .drop svg {
+        width: 24px;
+        height: 24px;
+        color: var(--color-text-muted);
+        flex: none;
+      }
+      .drop p {
+        flex: 1;
+        font-size: var(--text-body);
+      }
+      .drop p span {
+        display: block;
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+      }
+      .drop input[type="file"] {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+      }
+      .drop input[type="file"]:focus-visible + label {
+        outline: 2px solid var(--color-focus);
+        outline-offset: 2px;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s-4);
+        margin-bottom: var(--s-3);
+      }
+      .sort {
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+      }
+
+      .list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        border-top: 1px solid var(--color-line);
+      }
+      .doc {
+        position: relative;
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr) 64px 150px 88px 96px 84px;
+        align-items: center;
+        gap: var(--s-5);
+        padding: var(--s-4) var(--s-3);
+        border-bottom: 1px solid var(--color-line);
+        transition: background-color 120ms ease-out;
+      }
+      @media (hover: hover) {
+        .doc:hover {
+          background: var(--color-hover);
+        }
+      }
+      .doc .title {
+        font: 500 var(--text-body) / 1.3 var(--font-ui);
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      /* whole row is the link target, actions sit above it */
+      .doc .title::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+      }
+      .doc .title-wrap {
+        min-width: 0;
+      }
+      .doc .slug {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: var(--s-1);
+        color: var(--color-text-muted);
+        font-size: var(--text-sm);
+      }
+      .doc .slug svg {
+        width: 13px;
+        height: 13px;
+      }
+      .doc .views {
+        text-align: end;
+        font-size: var(--text-ui);
+      }
+      .doc .views small {
+        display: block;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+      .doc .date {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+      .doc .actions {
+        position: relative;
+        display: flex;
+        justify-content: end;
+        gap: var(--s-1);
+      }
+      .colhead {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr) 64px 150px 88px 96px 84px;
+        gap: var(--s-5);
+        padding: 0 var(--s-3) var(--s-2);
+        font: 500 var(--text-xs) / 1 var(--font-mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+      }
+      .colhead .r {
+        text-align: end;
+      }
+
+      .toast {
+        position: fixed;
+        inset-inline-end: var(--s-6);
+        bottom: var(--s-6);
+        display: flex;
+        align-items: center;
+        gap: var(--s-3);
+        padding: var(--s-3) var(--s-4);
+        border-radius: var(--r);
+        background: var(--color-ink);
+        color: var(--paper-50);
+        font-size: var(--text-ui);
+      }
+      .toast svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      @media (max-width: 960px) {
+        .colhead {
+          display: none;
+        }
+        .doc {
+          grid-template-columns: 48px minmax(0, 1fr) auto;
+          row-gap: var(--s-2);
+        }
+        .doc .mini {
+          width: 48px;
+          grid-row: span 2;
+        }
+        .doc .badge,
+        .doc .date {
+          display: none;
+        }
+        .doc .status {
+          grid-column: 2;
+        }
+        .doc .views {
+          grid-column: 3;
+          grid-row: 1;
+        }
+        .doc .actions {
+          grid-column: 3;
+          grid-row: 2;
+        }
+        .topbar nav,
+        .search {
+          display: none;
+        }
+        .drop {
+          flex-wrap: wrap;
+        }
+        .drop p {
+          flex-basis: calc(100% - 48px);
+        }
+        .toolbar {
+          flex-wrap: wrap;
+        }
+        .sort {
+          display: none;
+        }
+        .head h1 {
+          font-size: 44px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="wordmark" href="dashboard.html">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.75 2.75h7.5l3 3v11.5h-10.5z" /><path d="M12.25 2.75v3h3" /></svg>
+          Vellum
+        </a>
+        <nav aria-label="Main">
+          <a href="dashboard.html" aria-current="page">Documents</a>
+          <a href="#">Activity</a>
+          <a href="#">Settings</a>
+        </nav>
+        <span class="spacer"></span>
+        <div class="search" role="search">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.25" /><path d="m10.25 10.25 3 3" stroke-linecap="round" /></svg>
+          <label class="visually-hidden" for="q">Search documents</label>
+          <input class="input" id="q" type="search" placeholder="Search" />
+          <kbd aria-hidden="true">/</kbd>
+        </div>
+        <a class="btn btn-primary" href="upload.html">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round" /></svg>
+          Upload
+        </a>
+        <span class="avatar" role="img" aria-label="Signed in as Amirali">A</span>
+      </div>
+    </header>
+
+    <main id="main" class="page">
+      <div class="head">
+        <div>
+          <h1 class="display">Documents</h1>
+          <p class="summary"><span class="num">6</span> documents · <span class="num">2,090</span> views this month</p>
+        </div>
+      </div>
+
+      <div class="drop" id="drop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4" stroke-linecap="round" stroke-linejoin="round" /><path d="M4.75 14v4.25c0 .55.45 1 1 1h12.5c.55 0 1-.45 1-1V14" stroke-linecap="round" /></svg>
+        <p>
+          Drop a <code class="mono">.md</code> or <code class="mono">.html</code> file anywhere to publish it
+          <span>HTML with images or CSS? Upload a .zip with an index.html at the root.</span>
+        </p>
+        <input type="file" id="file" accept=".md,.markdown,.html,.htm,.zip" />
+        <label class="btn btn-secondary" for="file">Choose file</label>
+      </div>
+
+      <div class="toolbar">
+        <div class="segmented" role="radiogroup" aria-label="Filter documents">
+          <input type="radio" name="f" id="f-all" checked /><label for="f-all">All <span class="count">6</span></label>
+          <input type="radio" name="f" id="f-live" /><label for="f-live">Live <span class="count">4</span></label>
+          <input type="radio" name="f" id="f-draft" /><label for="f-draft">Drafts <span class="count">1</span></label>
+          <input type="radio" name="f" id="f-exp" /><label for="f-exp">Expired <span class="count">1</span></label>
+        </div>
+        <span class="sort">Sorted by last updated</span>
+      </div>
+
+      <div class="colhead" aria-hidden="true">
+        <span></span><span>Document</span><span>Type</span><span>Status</span><span class="r">Views</span><span>Updated</span><span></span>
+      </div>
+
+      <ul class="list">
+        <li class="doc">
+          <div class="mini" aria-hidden="true">
+            <div class="t">Website redesign proposal</div>
+            <div class="l"></div><div class="l m"></div><div class="l"></div><div class="l s"></div>
+            <div class="blk"></div>
+            <div class="l"></div><div class="l m"></div>
+          </div>
+          <div class="title-wrap">
+            <a class="title" href="document.html">Acme Corp — Website redesign proposal</a>
+            <div class="slug">
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-label="Password protected" role="img"><rect x="2.75" y="6.25" width="8.5" height="5.5" rx="1" /><path d="M4.75 6.25V4.5a2.25 2.25 0 0 1 4.5 0v1.75" /></svg>
+              <span class="mono">/p/acme-proposal</span>
+            </div>
+          </div>
+          <span class="badge">MD</span>
+          <span class="status status-live"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="currentColor" /></svg>Live</span>
+          <span class="views num">248<small>61 people</small></span>
+          <span class="date">2 hours ago</span>
+          <div class="actions">
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="Copy link to Acme Corp proposal">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5" stroke-linecap="round" /><path d="M7 4.5 8.25 3.25a2.47 2.47 0 0 1 3.5 3.5L10.5 8M9 11.5l-1.25 1.25a2.47 2.47 0 0 1-3.5-3.5L5.5 8" stroke-linecap="round" /></svg>
+            </button>
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="More actions for Acme Corp proposal">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg>
+            </button>
+          </div>
+        </li>
+
+        <li class="doc">
+          <div class="mini dark" aria-hidden="true">
+            <div class="l s"></div>
+            <div class="big">$1.2M</div>
+            <div class="l"></div><div class="l m"></div>
+          </div>
+          <div class="title-wrap">
+            <a class="title" href="view-html.html">Weft — Seed round pitch</a>
+            <div class="slug"><span class="mono">/p/weft-seed</span></div>
+          </div>
+          <span class="badge">HTML</span>
+          <span class="status status-live"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="currentColor" /></svg>Live</span>
+          <span class="views num">1,204<small>390 people</small></span>
+          <span class="date">Oct 24</span>
+          <div class="actions">
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="Copy link to Weft seed pitch">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5" stroke-linecap="round" /><path d="M7 4.5 8.25 3.25a2.47 2.47 0 0 1 3.5 3.5L10.5 8M9 11.5l-1.25 1.25a2.47 2.47 0 0 1-3.5-3.5L5.5 8" stroke-linecap="round" /></svg>
+            </button>
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="More actions for Weft seed pitch">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg>
+            </button>
+          </div>
+        </li>
+
+        <li class="doc">
+          <div class="mini" aria-hidden="true">
+            <div class="t">Q3 infrastructure report</div>
+            <div class="l m"></div><div class="l s"></div>
+            <div class="blk"></div><div class="blk" style="height: 8px"></div>
+            <div class="l"></div>
+          </div>
+          <div class="title-wrap">
+            <a class="title" href="view-markdown.html">Q3 infrastructure report</a>
+            <div class="slug"><span class="mono">/p/q3-infra-report</span></div>
+          </div>
+          <span class="badge">MD</span>
+          <span class="status status-warn"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="7" cy="7" r="4.75" /><path d="M7 4.5V7l1.75 1" stroke-linecap="round" /></svg>Expires in 3 days</span>
+          <span class="views num">37<small>9 people</small></span>
+          <span class="date">Oct 21</span>
+          <div class="actions">
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="Copy link to Q3 infrastructure report">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5" stroke-linecap="round" /><path d="M7 4.5 8.25 3.25a2.47 2.47 0 0 1 3.5 3.5L10.5 8M9 11.5l-1.25 1.25a2.47 2.47 0 0 1-3.5-3.5L5.5 8" stroke-linecap="round" /></svg>
+            </button>
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="More actions for Q3 infrastructure report">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg>
+            </button>
+          </div>
+        </li>
+
+        <li class="doc">
+          <div class="mini" aria-hidden="true">
+            <div class="t">Getting started with Landin</div>
+            <div class="l"></div><div class="l"></div><div class="l s"></div>
+            <div class="l m"></div><div class="l"></div><div class="l"></div><div class="l s"></div>
+          </div>
+          <div class="title-wrap">
+            <a class="title" href="#">Landin — Client onboarding guide</a>
+            <div class="slug"><span class="mono">/p/landin-onboarding</span></div>
+          </div>
+          <span class="badge">MD</span>
+          <span class="status status-live"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="currentColor" /></svg>Live</span>
+          <span class="views num">512<small>140 people</small></span>
+          <span class="date">Oct 12</span>
+          <div class="actions">
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="Copy link to Landin onboarding guide">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5" stroke-linecap="round" /><path d="M7 4.5 8.25 3.25a2.47 2.47 0 0 1 3.5 3.5L10.5 8M9 11.5l-1.25 1.25a2.47 2.47 0 0 1-3.5-3.5L5.5 8" stroke-linecap="round" /></svg>
+            </button>
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="More actions for Landin onboarding guide">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg>
+            </button>
+          </div>
+        </li>
+
+        <li class="doc">
+          <div class="mini" aria-hidden="true">
+            <div class="t">Pricing</div>
+            <div class="blk" style="height: 20px"></div>
+            <div class="l s"></div><div class="l m"></div>
+          </div>
+          <div class="title-wrap">
+            <a class="title" href="upload.html">Doran — Pricing one-pager</a>
+            <div class="slug"><span class="mono">/p/doran-pricing</span></div>
+          </div>
+          <span class="badge">HTML</span>
+          <span class="status status-off"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 2" aria-hidden="true"><circle cx="7" cy="7" r="4.25" /></svg>Draft</span>
+          <span class="views num muted">—<small>Not shared</small></span>
+          <span class="date">Oct 9</span>
+          <div class="actions">
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="More actions for Doran pricing one-pager">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg>
+            </button>
+          </div>
+        </li>
+
+        <li class="doc">
+          <div class="mini" aria-hidden="true" style="opacity: 0.6">
+            <div class="t">Partnership brief</div>
+            <div class="l"></div><div class="l m"></div><div class="l"></div>
+            <div class="l s"></div><div class="l"></div>
+          </div>
+          <div class="title-wrap">
+            <a class="title" href="#">Wesend — Partnership brief</a>
+            <div class="slug"><span class="mono">/p/wesend-brief</span></div>
+          </div>
+          <span class="badge">MD</span>
+          <span class="status status-off"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="7" cy="7" r="4.75" /><path d="m4.5 9.5 5-5" stroke-linecap="round" /></svg>Expired Oct 1</span>
+          <span class="views num">89<small>22 people</small></span>
+          <span class="date">Sep 17</span>
+          <div class="actions">
+            <button class="btn btn-ghost btn-icon" type="button" aria-label="More actions for Wesend partnership brief">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg>
+            </button>
+          </div>
+        </li>
+      </ul>
+    </main>
+
+    <div class="toast" role="status">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      Link copied
+    </div>
+
+    <a class="mock-nav" href="index.html">← All screens</a>
+
+    <script>
+      // Mockup only: show the drop-zone hover state while dragging a file over the page.
+      const drop = document.getElementById("drop");
+      addEventListener("dragover", (e) => {
+        e.preventDefault();
+        drop.classList.add("is-over");
+      });
+      addEventListener("dragleave", (e) => {
+        if (!e.relatedTarget) drop.classList.remove("is-over");
+      });
+      addEventListener("drop", (e) => {
+        e.preventDefault();
+        location.href = "upload.html";
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Q3 infrastructure report</title>
+    <link rel="stylesheet" href="assets/vellum.css" />
+    <style>
+      body {
+        background: var(--color-surface);
+      }
+      .progress {
+        position: fixed;
+        inset: 0 0 auto;
+        height: 2px;
+        z-index: 10;
+        background: var(--color-ink);
+        transform-origin: 0 50%;
+        transform: scaleX(0);
+      }
+      .reader-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s-4);
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: var(--s-5) var(--s-6);
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+      .reader-bar .who {
+        display: flex;
+        align-items: center;
+        gap: var(--s-3);
+      }
+      .reader-bar .avatar {
+        width: 28px;
+        height: 28px;
+        font-size: var(--text-xs);
+      }
+
+      .reader {
+        display: grid;
+        grid-template-columns: 200px minmax(0, 680px) 200px;
+        justify-content: center;
+        gap: var(--s-12);
+        padding: var(--s-16) var(--s-6) var(--s-24);
+      }
+
+      .toc {
+        position: sticky;
+        top: var(--s-12);
+        align-self: start;
+        font-size: var(--text-sm);
+      }
+      .toc p {
+        margin-bottom: var(--s-3);
+      }
+      .toc ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        border-inline-start: 1px solid var(--color-line);
+      }
+      .toc a {
+        display: block;
+        margin-inline-start: -1px;
+        padding: 6px 0 6px var(--s-3);
+        border-inline-start: 1px solid transparent;
+        color: var(--color-text-muted);
+        text-decoration: none;
+        line-height: 1.35;
+        transition: color 120ms ease-out, border-color 120ms ease-out;
+      }
+      .toc a[aria-current="true"] {
+        color: var(--color-text);
+        border-color: var(--color-ink);
+      }
+      @media (hover: hover) {
+        .toc a:hover {
+          color: var(--color-text);
+        }
+      }
+
+      /* Markdown output */
+      .prose {
+        font-family: var(--font-display);
+        font-size: 19px;
+        line-height: 1.65;
+        font-optical-sizing: auto;
+      }
+      .prose > * + * {
+        margin-top: 1.1em;
+      }
+      .prose .eyebrow {
+        font-family: var(--font-mono);
+      }
+      .prose h1 {
+        margin-top: var(--s-4);
+        font: 400 clamp(44px, 6vw, 72px) / 1.02 var(--font-display);
+        letter-spacing: -0.035em;
+      }
+      .prose .dek {
+        margin-top: var(--s-6);
+        font-size: 23px;
+        line-height: 1.45;
+        color: var(--color-text-secondary);
+        text-wrap: pretty;
+      }
+      .prose .byline {
+        margin-top: var(--s-8);
+        padding-bottom: var(--s-10);
+        border-bottom: 1px solid var(--color-line);
+        font: 400 var(--text-sm) / 1.5 var(--font-ui);
+        color: var(--color-text-muted);
+      }
+      .prose h2 {
+        margin-top: 2.4em;
+        font: 500 30px / 1.2 var(--font-display);
+        letter-spacing: -0.02em;
+        scroll-margin-top: var(--s-12);
+      }
+      .prose h3 {
+        margin-top: 1.8em;
+        font: 600 var(--text-body) / 1.4 var(--font-ui);
+      }
+      .prose h2 + *,
+      .prose h3 + * {
+        margin-top: 0.6em;
+      }
+      .prose ul,
+      .prose ol {
+        padding-inline-start: 1.2em;
+      }
+      .prose li + li {
+        margin-top: 0.35em;
+      }
+      .prose li::marker {
+        color: var(--color-text-muted);
+      }
+      .prose a {
+        text-decoration-line: underline;
+        text-decoration-thickness: from-font;
+        text-decoration-skip-ink: auto;
+        text-underline-offset: 3px;
+        text-decoration-color: rgb(28 26 23 / 0.35);
+      }
+      .prose blockquote {
+        margin-inline: 0;
+        padding-inline-start: var(--s-6);
+        border-inline-start: 2px solid var(--color-ink);
+        font-style: italic;
+        font-size: 22px;
+        line-height: 1.5;
+      }
+      .prose code {
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--color-sunken);
+        font: 400 0.82em / 1 var(--font-mono);
+      }
+      .prose pre {
+        padding: var(--s-5) var(--s-6);
+        border-radius: var(--r);
+        background: var(--color-ink);
+        color: var(--paper-100);
+        overflow-x: auto;
+        font: 400 var(--text-ui) / 1.65 var(--font-mono);
+      }
+      .prose pre code {
+        padding: 0;
+        background: none;
+        font: inherit;
+      }
+      .prose pre .c {
+        color: rgb(246 244 239 / 0.5);
+      }
+      .prose table {
+        width: 100%;
+        border-collapse: collapse;
+        font: 400 var(--text-ui) / 1.45 var(--font-ui);
+        font-variant-numeric: tabular-nums;
+      }
+      .prose th {
+        text-align: start;
+        padding: var(--s-2) var(--s-3) var(--s-2) 0;
+        border-bottom: 1px solid var(--color-line-strong);
+        font-weight: 600;
+      }
+      .prose td {
+        padding: var(--s-3) var(--s-3) var(--s-3) 0;
+        border-bottom: 1px solid var(--color-line);
+      }
+      .prose .r {
+        text-align: end;
+        padding-inline-end: 0;
+      }
+      .prose hr {
+        margin: 3em 0;
+        border: 0;
+        text-align: center;
+      }
+      .prose hr::after {
+        content: "· · ·";
+        color: var(--color-text-muted);
+        letter-spacing: 0.6em;
+      }
+
+      .side-note {
+        position: sticky;
+        top: var(--s-12);
+        align-self: start;
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+
+      .end {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s-6);
+        flex-wrap: wrap;
+        margin-top: var(--s-16);
+        padding: var(--s-6) 0;
+        border-top: 1px solid var(--color-ink);
+        font-family: var(--font-ui);
+      }
+      .end p {
+        font-size: var(--text-body);
+      }
+      .end p span {
+        display: block;
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+      }
+
+      .colophon {
+        padding: 0 var(--s-6) var(--s-12);
+        text-align: center;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+      .colophon a {
+        text-decoration: none;
+      }
+
+      @media (max-width: 1180px) {
+        .reader {
+          grid-template-columns: minmax(0, 680px);
+        }
+        .toc,
+        .side-note {
+          display: none;
+        }
+      }
+      @media (max-width: 600px) {
+        .reader {
+          padding-top: var(--s-8);
+        }
+        .prose {
+          font-size: 18px;
+        }
+        .reader-bar .print {
+          display: none;
+        }
+      }
+      @media print {
+        .reader-bar,
+        .toc,
+        .side-note,
+        .progress,
+        .mock-nav,
+        .end .btn {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="progress" aria-hidden="true"></div>
+    <a class="skip-link" href="#doc">Skip to content</a>
+
+    <header class="reader-bar">
+      <div class="who">
+        <span class="avatar" aria-hidden="true">A</span>
+        <span>Shared by <b style="color: var(--color-text); font-weight: 500">Amirali</b> · Updated Oct 21, 2026</span>
+      </div>
+      <div style="display: flex; gap: var(--s-2)">
+        <button class="btn btn-ghost print" type="button" onclick="print()">Print or save as PDF</button>
+        <a class="btn btn-ghost" href="#" download>Download .md</a>
+      </div>
+    </header>
+
+    <div class="reader">
+      <nav class="toc" aria-label="On this page">
+        <p class="eyebrow">On this page</p>
+        <ol>
+          <li><a href="#summary" aria-current="true">Summary</a></li>
+          <li><a href="#uptime">Uptime &amp; incidents</a></li>
+          <li><a href="#cost">Cost</a></li>
+          <li><a href="#changes">What changed</a></li>
+          <li><a href="#q4">Plan for Q4</a></li>
+        </ol>
+      </nav>
+
+      <main id="doc">
+        <article class="prose">
+          <p class="eyebrow">Report · Q3 2026</p>
+          <h1>Q3 infrastructure report</h1>
+          <p class="dek">We moved every service onto one VPS cluster, cut hosting cost by 38%, and had one incident that customers noticed.</p>
+          <p class="byline">7 min read · 1,420 words</p>
+
+          <h2 id="summary">Summary</h2>
+          <p>This quarter was about consolidation. In July we were paying three providers for overlapping work. By the end of September everything ran on two Hetzner machines managed through Dokploy, with Postgres on a dedicated volume and nightly off-site backups.</p>
+          <ul>
+            <li>Monthly hosting fell from <b>€412</b> to <b>€255</b>.</li>
+            <li>p95 API latency improved from 340 ms to 190 ms.</li>
+            <li>One customer-visible incident, on August 14, lasting 22 minutes.</li>
+          </ul>
+
+          <h2 id="uptime">Uptime &amp; incidents</h2>
+          <p>Measured uptime across public endpoints was 99.94%, against a target of 99.9%.</p>
+          <table>
+            <thead>
+              <tr><th scope="col">Service</th><th scope="col" class="r">Uptime</th><th scope="col" class="r">p95 latency</th><th scope="col" class="r">Incidents</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Public API</td><td class="r">99.94%</td><td class="r">190 ms</td><td class="r">1</td></tr>
+              <tr><td>Dashboard</td><td class="r">99.98%</td><td class="r">120 ms</td><td class="r">0</td></tr>
+              <tr><td>Webhooks</td><td class="r">99.91%</td><td class="r">410 ms</td><td class="r">0</td></tr>
+            </tbody>
+          </table>
+          <blockquote>The August incident was a disk filling up with unrotated logs. Nothing was wrong with the code; we had simply never told Docker to stop keeping everything.</blockquote>
+          <p>The fix was a one-line change to the daemon config, now applied to every host:</p>
+          <pre><code><span class="c"># /etc/docker/daemon.json</span>
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "20m", "max-file": "5" }
+}</code></pre>
+
+          <h2 id="cost">Cost</h2>
+          <p>Most of the saving came from dropping the managed database. Running Postgres ourselves adds about two hours of work a month, which we think is a fair trade at this size. See <a href="#">the backup runbook</a> for how restores are tested.</p>
+
+          <h2 id="changes">What changed</h2>
+          <h3>Deploys</h3>
+          <p>Every app now builds from a <code>Dockerfile</code> in its repo and deploys on push to <code>main</code>. Rollbacks are a single click in Dokploy.</p>
+          <h3>Monitoring</h3>
+          <p>Each service exposes <code>/health</code>, polled every 30 seconds. Alerts go to one Telegram channel instead of three inboxes.</p>
+
+          <hr />
+
+          <h2 id="q4">Plan for Q4</h2>
+          <ol>
+            <li>Move object storage off S3 to the same provider.</li>
+            <li>Add a staging environment that mirrors production.</li>
+            <li>Test a full restore from backup once a month, not once a quarter.</li>
+          </ol>
+
+          <div class="end">
+            <p>Questions about this report?<span>Amirali usually replies within a day.</span></p>
+            <a class="btn btn-primary btn-lg" href="mailto:hello@example.com">Reply to Amirali</a>
+          </div>
+        </article>
+      </main>
+
+      <aside class="side-note" aria-label="Reading time">
+        <p class="eyebrow" style="margin-bottom: var(--s-2)">Reading</p>
+        <p><span class="num" id="left">7</span> min left</p>
+      </aside>
+    </div>
+
+    <footer class="colophon">Shared with <a href="#">Vellum</a></footer>
+
+    <a class="mock-nav" href="index.html">← All screens</a>
+
+    <script>
+      const bar = document.querySelector(".progress");
+      const left = document.getElementById("left");
+      const links = [...document.querySelectorAll(".toc a")];
+      const heads = links.map((a) => document.querySelector(a.getAttribute("href")));
+      addEventListener(
+        "scroll",
+        () => {
+          const max = document.documentElement.scrollHeight - innerHeight;
+          const p = max > 0 ? scrollY / max : 0;
+          bar.style.transform = `scaleX(${p})`;
+          left.textContent = Math.max(0, Math.ceil(7 * (1 - p)));
+          let active = 0;
+          heads.forEach((h, i) => {
+            if (h.getBoundingClientRect().top < innerHeight * 0.3) active = i;
+          });
+          links.forEach((a, i) => a.setAttribute("aria-current", i === active ? "true" : "false"));
+        },
+        { passive: true }
+      );
+    </script>
+  </body>
+</html>

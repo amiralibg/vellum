@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Protected document</title>
+    <link rel="stylesheet" href="assets/vellum.css" />
+    <style>
+      body {
+        min-height: 100dvh;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      .state-switch {
+        display: flex;
+        justify-content: center;
+        padding: var(--s-4);
+      }
+      main {
+        display: grid;
+        place-items: center;
+        padding: var(--s-8) var(--s-6) var(--s-16);
+      }
+      .gate {
+        width: min(440px, 100%);
+      }
+      .gate .mini {
+        width: 72px;
+        margin-bottom: var(--s-8);
+        padding: 9px 8px;
+      }
+      .gate .mini .t {
+        font-size: 8px;
+      }
+      .gate h1 {
+        font-size: 44px;
+      }
+      .gate .sub {
+        margin-top: var(--s-4);
+        font-size: var(--text-body);
+        color: var(--color-text-secondary);
+        text-wrap: pretty;
+      }
+      .gate form {
+        display: grid;
+        gap: var(--s-4);
+        margin-top: var(--s-8);
+      }
+      .gate .row {
+        display: flex;
+        gap: var(--s-2);
+      }
+      .gate .row .input {
+        flex: 1;
+      }
+      .gate .from {
+        display: flex;
+        align-items: center;
+        gap: var(--s-3);
+        margin-top: var(--s-10);
+        padding-top: var(--s-6);
+        border-top: 1px solid var(--color-line);
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+      .gate .from .avatar {
+        width: 28px;
+        height: 28px;
+        font-size: var(--text-xs);
+      }
+      .gate .from a {
+        margin-inline-start: auto;
+      }
+      .colophon {
+        padding: var(--s-6);
+        text-align: center;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="state-switch">
+      <div class="segmented" role="radiogroup" aria-label="Mockup state">
+        <input type="radio" name="s" id="s-locked" value="locked" checked /><label for="s-locked">Locked</label>
+        <input type="radio" name="s" id="s-wrong" value="wrong" /><label for="s-wrong">Wrong password</label>
+        <input type="radio" name="s" id="s-expired" value="expired" /><label for="s-expired">Expired</label>
+        <input type="radio" name="s" id="s-missing" value="missing" /><label for="s-missing">Not found</label>
+      </div>
+    </div>
+
+    <main>
+      <!-- Locked + wrong password -->
+      <section class="gate" data-state="locked wrong">
+        <div class="mini" aria-hidden="true">
+          <div class="t">Website redesign proposal</div>
+          <div class="l"></div><div class="l m"></div><div class="l"></div><div class="l s"></div>
+          <div class="blk"></div><div class="l"></div>
+        </div>
+        <p class="eyebrow" style="margin-bottom: var(--s-3)">Protected document</p>
+        <h1 class="display">Acme Corp — Website redesign proposal</h1>
+        <p class="sub">Amirali shared this with a password. It should have come with the link.</p>
+        <form action="view-markdown.html" novalidate>
+          <label class="label" for="pw">Password</label>
+          <div class="row">
+            <input class="input" id="pw" name="password" type="password" autocomplete="off" />
+            <button class="btn btn-primary btn-lg" type="submit">Open document</button>
+          </div>
+          <p class="error" id="pw-error" hidden>
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="7" cy="7" r="5.25" /><path d="M7 4.25v3.25" stroke-linecap="round" /><circle cx="7" cy="9.75" r="0.5" fill="currentColor" /></svg>
+            That password doesn’t match. Check for spaces or capital letters.
+          </p>
+        </form>
+        <div class="from">
+          <span class="avatar" aria-hidden="true">A</span>
+          <span>Shared by Amirali</span>
+          <a class="btn btn-ghost" href="mailto:hello@example.com">Ask for access</a>
+        </div>
+      </section>
+
+      <!-- Expired -->
+      <section class="gate" data-state="expired" hidden>
+        <p class="eyebrow" style="margin-bottom: var(--s-3)">Link expired</p>
+        <h1 class="display">This link closed on October 1</h1>
+        <p class="sub">Amirali set “Wesend — Partnership brief” to stop being shared after 30 days. If you still need it, ask for a new link.</p>
+        <div class="from">
+          <span class="avatar" aria-hidden="true">A</span>
+          <span>Shared by Amirali</span>
+          <a class="btn btn-secondary" href="mailto:hello@example.com">Ask for a new link</a>
+        </div>
+      </section>
+
+      <!-- Not found -->
+      <section class="gate" data-state="missing" hidden>
+        <p class="eyebrow" style="margin-bottom: var(--s-3)">404</p>
+        <h1 class="display">Nothing is shared at this address</h1>
+        <p class="sub">The link may have a typo, or the document was unpublished. Check the address with the person who sent it.</p>
+        <p class="mono" style="margin-top: var(--s-6); color: var(--color-text-muted)">docs.amirali.dev/p/acme-propsal</p>
+      </section>
+    </main>
+
+    <footer class="colophon">Shared with Vellum</footer>
+    <a class="mock-nav" href="index.html">← All screens</a>
+
+    <script>
+      const pw = document.getElementById("pw");
+      const err = document.getElementById("pw-error");
+      document.querySelectorAll('input[name="s"]').forEach((r) =>
+        r.addEventListener("change", () => {
+          const s = r.value;
+          document.querySelectorAll("[data-state]").forEach((el) => (el.hidden = !el.dataset.state.split(" ").includes(s)));
+          const wrong = s === "wrong";
+          err.hidden = !wrong;
+          pw.toggleAttribute("aria-invalid", wrong);
+          if (wrong) {
+            pw.setAttribute("aria-invalid", "true");
+            pw.setAttribute("aria-describedby", "pw-error");
+            pw.value = "acme-q3";
+          } else {
+            pw.removeAttribute("aria-describedby");
+            pw.value = "";
+          }
+        })
+      );
+    </script>
+  </body>
+</html>

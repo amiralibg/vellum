@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in · Vellum</title>
+    <link rel="stylesheet" href="assets/vellum.css" />
+    <style>
+      .split {
+        display: grid;
+        grid-template-columns: 1.35fr 1fr;
+        min-height: 100dvh;
+      }
+      .pitch {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: var(--s-10) var(--s-12);
+        border-inline-end: 1px solid var(--color-line);
+      }
+      .pitch h1 {
+        font-size: clamp(56px, 7.4vw, var(--text-display));
+        max-width: 11ch;
+      }
+      .pitch h1 em {
+        font-style: italic;
+        color: var(--color-text-secondary);
+      }
+      .pitch .lede {
+        max-width: 44ch;
+        margin-top: var(--s-6);
+        font-size: var(--text-lg);
+        color: var(--color-text-secondary);
+        text-wrap: pretty;
+      }
+      .link-slip {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--s-3);
+        margin-top: var(--s-10);
+        padding: var(--s-3) var(--s-4);
+        border: 1px dashed var(--color-line-strong);
+        border-radius: var(--r);
+        font-family: var(--font-mono);
+        font-size: var(--text-ui);
+      }
+      .link-slip .muted {
+        font-size: var(--text-sm);
+      }
+      .foot {
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+      }
+      .form-side {
+        display: grid;
+        place-items: center;
+        padding: var(--s-10) var(--s-6);
+        background: var(--color-surface);
+      }
+      form {
+        display: grid;
+        gap: var(--s-5);
+        width: min(360px, 100%);
+      }
+      form h2 {
+        font: 500 var(--text-h3) / 1.2 var(--font-ui);
+        letter-spacing: -0.01em;
+      }
+      form .sub {
+        margin-top: var(--s-1);
+        color: var(--color-text-secondary);
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .row a {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+      @media (max-width: 880px) {
+        .split {
+          grid-template-columns: 1fr;
+        }
+        .pitch {
+          border-inline-end: 0;
+          border-bottom: 1px solid var(--color-line);
+          padding: var(--s-8) var(--s-6);
+          gap: var(--s-10);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="split">
+      <section class="pitch" aria-labelledby="pitch-title">
+        <a class="wordmark" href="index.html">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.75 2.75h7.5l3 3v11.5h-10.5z" /><path d="M12.25 2.75v3h3" /></svg>
+          Vellum
+        </a>
+        <div>
+          <h1 id="pitch-title" class="display">Send a link, <em>not an attachment.</em></h1>
+          <p class="lede">Upload a proposal, pitch or report as Markdown or HTML. Vellum renders it and gives you one link to share, on your own server.</p>
+          <div class="link-slip" aria-hidden="true">
+            <span>docs.amirali.dev/p/<b>acme-proposal</b></span>
+            <span class="muted">248 views</span>
+          </div>
+        </div>
+        <p class="foot">Self-hosted · v0.1</p>
+      </section>
+
+      <section class="form-side" aria-labelledby="signin-title">
+        <form action="dashboard.html" novalidate>
+          <div>
+            <h2 id="signin-title">Sign in</h2>
+            <p class="sub">Only the owner of this server can sign in.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="email">Email</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="email" placeholder="name@example.com" />
+          </div>
+          <div class="field">
+            <div class="row">
+              <label class="label" for="password">Password</label>
+            </div>
+            <input class="input" id="password" name="password" type="password" autocomplete="current-password" />
+          </div>
+          <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
+        </form>
+      </section>
+    </main>
+    <a class="mock-nav" href="index.html">← All screens</a>
+  </body>
+</html>

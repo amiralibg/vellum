@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vellum · Design mockups</title>
+    <link rel="stylesheet" href="assets/vellum.css" />
+    <style>
+      .page {
+        max-width: 1040px;
+      }
+      h1 {
+        font-size: clamp(56px, 9vw, var(--text-display));
+      }
+      .lede {
+        max-width: 56ch;
+        margin-top: var(--s-6);
+        font-size: var(--text-lg);
+        color: var(--color-text-secondary);
+        text-wrap: pretty;
+      }
+      h2 {
+        margin: var(--s-16) 0 var(--s-4);
+      }
+      .screens {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        border-top: 1px solid var(--color-line);
+        counter-reset: n;
+      }
+      .screens li {
+        position: relative;
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        gap: var(--s-6);
+        align-items: baseline;
+        padding: var(--s-5) var(--s-2);
+        border-bottom: 1px solid var(--color-line);
+        counter-increment: n;
+        transition: background-color 120ms ease-out;
+      }
+      .screens li::before {
+        content: counter(n, decimal-leading-zero);
+        font: 400 var(--text-sm) / 1 var(--font-mono);
+        color: var(--color-text-muted);
+      }
+      @media (hover: hover) {
+        .screens li:hover {
+          background: var(--color-hover);
+        }
+      }
+      .screens a {
+        font: 400 28px / 1.15 var(--font-display);
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+      .screens a::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+      }
+      .screens p {
+        margin-top: var(--s-2);
+        max-width: 60ch;
+        color: var(--color-text-secondary);
+        text-wrap: pretty;
+      }
+      .screens .who {
+        font: 500 var(--text-xs) / 1 var(--font-mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        white-space: nowrap;
+      }
+      .rules {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: var(--s-8);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .rules li {
+        padding-top: var(--s-4);
+        border-top: 1px solid var(--color-ink);
+      }
+      .rules b {
+        display: block;
+        margin-bottom: var(--s-2);
+        font-weight: 500;
+      }
+      .rules span {
+        color: var(--color-text-secondary);
+      }
+      .swatches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--s-6);
+        margin-top: var(--s-8);
+      }
+      .swatch {
+        display: grid;
+        gap: var(--s-2);
+        font-size: var(--text-sm);
+      }
+      .swatch i {
+        display: block;
+        width: 96px;
+        height: 64px;
+        border-radius: var(--r);
+        outline: 1px solid var(--color-line);
+      }
+      .swatch code {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <p class="eyebrow">Vellum · Design review · Oct 28, 2026</p>
+      <h1 class="display" style="margin-top: var(--s-4)">Mockups</h1>
+      <p class="lede">A self-hosted place to upload Markdown or HTML and share it as a link. Seven screens: four for you as the owner, three for the people you send links to.</p>
+
+      <h2 class="eyebrow">Owner</h2>
+      <ol class="screens">
+        <li>
+          <div><a href="login.html">Sign in</a><p>Single-owner login. The left side doubles as the product pitch.</p></div>
+        </li>
+        <li>
+          <div><a href="dashboard.html">Documents</a><p>Your library. Drop a file anywhere on the page to publish. Each row shows a miniature of the document’s first page, its link, status and views.</p></div>
+        </li>
+        <li>
+          <div><a href="upload.html">Publish settings</a><p>Shown after a file is dropped. Live preview on the left; title, link, password, expiry and tracking on the right.</p></div>
+        </li>
+        <li>
+          <div><a href="document.html">Document detail</a><p>The share link with a copy button, view stats, a per-section read-through chart (see where people stop reading) and version history.</p></div>
+        </li>
+      </ol>
+
+      <h2 class="eyebrow">Reader</h2>
+      <ol class="screens" style="counter-reset: n 4">
+        <li>
+          <div><a href="view-markdown.html">Markdown reader</a><p>How a rendered .md looks to the person you sent it to: editorial typography, table of contents, reading progress, a reply button at the end, print-to-PDF.</p></div>
+        </li>
+        <li>
+          <div><a href="view-html.html">HTML document</a><p>Your HTML shown as-is, full screen. Vellum only adds a small pill that readers can hide.</p></div>
+        </li>
+        <li>
+          <div><a href="view-locked.html">Password, expired, not found</a><p>The gate pages. Use the switch at the top to see every state.</p></div>
+        </li>
+      </ol>
+
+      <h2 class="eyebrow">Design system</h2>
+      <ul class="rules">
+        <li><b>Paper, not white</b><span>Warm off-white canvas. Documents sit on a lighter sheet, like paper on a desk.</span></li>
+        <li><b>One vermilion button per screen</b><span>The accent is only for the main action. It never colors text, borders or icons.</span></li>
+        <li><b>Serif for documents, sans for the app</b><span>Newsreader for titles and reading, Geist for UI, Geist Mono for links.</span></li>
+        <li><b>No shadows</b><span>Surfaces are separated by hairlines and tone. Two radii: 6px and pill.</span></li>
+        <li><b>Documents are the imagery</b><span>No illustrations or photos. The only pictures are miniatures of your own pages.</span></li>
+      </ul>
+      <div class="swatches">
+        <div class="swatch"><i style="background: var(--paper-100)"></i>Canvas<code>#f6f4ef</code></div>
+        <div class="swatch"><i style="background: var(--paper-50)"></i>Sheet<code>#fbfaf7</code></div>
+        <div class="swatch"><i style="background: var(--paper-200)"></i>Sunken<code>#eeebe4</code></div>
+        <div class="swatch"><i style="background: var(--ink-900)"></i>Ink<code>#1c1a17</code></div>
+        <div class="swatch"><i style="background: var(--vermilion-600)"></i>Action<code>#c4432a</code></div>
+      </div>
+    </main>
+  </body>
+</html>

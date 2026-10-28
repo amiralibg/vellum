@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acme Corp — Website redesign proposal · Vellum</title>
+    <link rel="stylesheet" href="assets/vellum.css" />
+    <style>
+      .crumbs {
+        display: flex;
+        gap: var(--s-2);
+        color: var(--color-text-muted);
+        margin-bottom: var(--s-6);
+      }
+      .crumbs a {
+        color: var(--color-text-secondary);
+        text-decoration: none;
+      }
+      .head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: var(--s-8);
+        flex-wrap: wrap;
+      }
+      .head h1 {
+        font-size: 48px;
+        max-width: 18ch;
+      }
+      .meta-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--s-2) var(--s-4);
+        margin-top: var(--s-4);
+        color: var(--color-text-secondary);
+        font-size: var(--text-sm);
+      }
+      .meta-line > span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .meta-line svg {
+        width: 14px;
+        height: 14px;
+      }
+      .head-actions {
+        display: flex;
+        gap: var(--s-2);
+      }
+
+      /* The share slip: the one thing this page exists for */
+      .slip {
+        display: flex;
+        align-items: center;
+        gap: var(--s-4);
+        margin: var(--s-10) 0 var(--s-12);
+        padding: var(--s-4) var(--s-4) var(--s-4) var(--s-6);
+        border: 1px dashed var(--color-line-strong);
+        border-radius: var(--r);
+        background: var(--color-surface);
+      }
+      .slip .url {
+        flex: 1;
+        min-width: 0;
+        font: 400 22px / 1.3 var(--font-mono);
+        letter-spacing: -0.02em;
+        overflow-wrap: anywhere;
+      }
+      .slip .url span {
+        color: var(--color-text-muted);
+      }
+      .slip .pw {
+        padding-inline: var(--s-4);
+        border-inline-start: 1px solid var(--color-line);
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+      .slip .pw b {
+        display: block;
+        font: 500 var(--text-ui) / 1.4 var(--font-mono);
+        color: var(--color-text);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: var(--s-16);
+      }
+
+      section + section {
+        margin-top: var(--s-16);
+      }
+      .sec-title {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--s-4);
+        margin-bottom: var(--s-6);
+      }
+      .sec-title h2 {
+        font: 500 var(--text-body) / 1.3 var(--font-ui);
+      }
+      .sec-title p {
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+      }
+
+      /* Stat row */
+      .stats {
+        display: grid;
+        grid-template-columns: 1.4fr repeat(3, 1fr);
+        align-items: end;
+        border-bottom: 1px solid var(--color-line);
+        padding-bottom: var(--s-8);
+      }
+      .stat dt {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+      .stat dd {
+        margin: var(--s-1) 0 0;
+        font: 400 var(--text-h2) / 1 var(--font-display);
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat.hero dd {
+        font-size: 96px;
+        letter-spacing: -0.045em;
+        line-height: 0.9;
+      }
+      .stat dd small {
+        font: 400 var(--text-ui) / 1 var(--font-ui);
+        letter-spacing: 0;
+        color: var(--color-text-muted);
+        margin-inline-start: 2px;
+      }
+
+      /* Bar chart */
+      .chart {
+        position: relative;
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: var(--s-2);
+      }
+      .y-axis {
+        position: relative;
+        height: 180px;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .y-axis span {
+        position: absolute;
+        inset-inline-end: 0;
+        translate: 0 50%;
+      }
+      .plot {
+        position: relative;
+        height: 180px;
+        display: flex;
+        align-items: end;
+        gap: 6px;
+        border-bottom: 1px solid var(--color-line-strong);
+      }
+      .grid-line {
+        position: absolute;
+        inset-inline: 0;
+        border-top: 1px solid var(--color-line);
+        pointer-events: none;
+      }
+      .bar {
+        position: relative;
+        flex: 1;
+        height: 100%;
+        display: flex;
+        align-items: end;
+        border: 0;
+        padding: 0;
+        background: none;
+        cursor: default;
+      }
+      .bar i {
+        display: block;
+        width: 100%;
+        border-radius: 4px 4px 0 0;
+        background: rgb(28 26 23 / 0.78);
+        transition: background-color 120ms ease-out;
+      }
+      .bar.peak i {
+        background: var(--color-ink);
+      }
+      .bar .tip {
+        position: absolute;
+        bottom: calc(var(--h) + 8px);
+        left: 50%;
+        translate: -50% 0;
+        padding: 6px var(--s-2);
+        border-radius: var(--r);
+        background: var(--color-ink);
+        color: var(--paper-50);
+        font-size: var(--text-xs);
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease-out;
+        z-index: 2;
+      }
+      .bar .tip b {
+        font-variant-numeric: tabular-nums;
+      }
+      .bar:hover i,
+      .bar:focus-visible i {
+        background: var(--color-ink);
+      }
+      .plot:hover .bar:not(:hover) i {
+        background: rgb(28 26 23 / 0.3);
+      }
+      .bar:hover .tip,
+      .bar:focus-visible .tip {
+        opacity: 1;
+      }
+      .bar .label {
+        position: absolute;
+        bottom: calc(var(--h) + 6px);
+        left: 50%;
+        translate: -50% 0;
+        font-size: var(--text-xs);
+        font-weight: 500;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .bar:hover .label,
+      .bar:focus-visible .label,
+      .plot:hover .label {
+        opacity: 0;
+      }
+      .x-axis {
+        grid-column: 2;
+        display: flex;
+        justify-content: space-between;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+      details.table-view {
+        margin-top: var(--s-4);
+        font-size: var(--text-sm);
+      }
+      details.table-view summary {
+        cursor: pointer;
+        color: var(--color-text-secondary);
+        width: fit-content;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--text-ui);
+      }
+      th {
+        padding: 0 var(--s-3) var(--s-2);
+        text-align: start;
+        font: 500 var(--text-xs) / 1 var(--font-mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        border-bottom: 1px solid var(--color-line);
+      }
+      td {
+        padding: var(--s-3);
+        border-bottom: 1px solid var(--color-line);
+        font-variant-numeric: tabular-nums;
+      }
+      th:first-child,
+      td:first-child {
+        padding-inline-start: 0;
+      }
+      .r {
+        text-align: end;
+      }
+      .depth {
+        display: flex;
+        align-items: center;
+        gap: var(--s-3);
+      }
+      .depth .track {
+        flex: 1;
+        max-width: 120px;
+        height: 4px;
+        border-radius: var(--r-pill);
+        background: var(--color-sunken);
+      }
+      .depth .track i {
+        display: block;
+        height: 100%;
+        border-radius: var(--r-pill);
+        background: var(--color-ink);
+      }
+
+      /* Read-through by section */
+      .sections {
+        display: grid;
+        gap: var(--s-3);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .sections li {
+        display: grid;
+        grid-template-columns: 180px 1fr 44px;
+        align-items: center;
+        gap: var(--s-4);
+        font-size: var(--text-ui);
+      }
+      .sections .bar-h {
+        height: 20px;
+        border-radius: 0 4px 4px 0;
+        background: rgb(28 26 23 / 0.78);
+      }
+      .sections .v {
+        text-align: end;
+        font-variant-numeric: tabular-nums;
+      }
+      .callout {
+        margin-top: var(--s-6);
+        padding-inline-start: var(--s-4);
+        border-inline-start: 2px solid var(--color-ink);
+        font: italic 400 var(--text-lg) / 1.5 var(--font-display);
+        max-width: 56ch;
+      }
+
+      /* Side column */
+      .side {
+        display: grid;
+        align-content: start;
+        gap: var(--s-10);
+      }
+      .side h2 {
+        margin-bottom: var(--s-4);
+        font: 500 var(--text-ui) / 1.3 var(--font-ui);
+      }
+      .versions {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        border-top: 1px solid var(--color-line);
+      }
+      .versions li {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--s-3);
+        padding: var(--s-3) 0;
+        border-bottom: 1px solid var(--color-line);
+        font-size: var(--text-ui);
+      }
+      .versions .when {
+        color: var(--color-text-muted);
+        font-size: var(--text-sm);
+      }
+      .details {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: var(--s-3) var(--s-4);
+        margin: 0;
+        font-size: var(--text-sm);
+      }
+      .details dt {
+        color: var(--color-text-muted);
+      }
+      .details dd {
+        margin: 0;
+        text-align: end;
+      }
+      .danger {
+        display: grid;
+        gap: var(--s-2);
+        padding-top: var(--s-6);
+        border-top: 1px solid var(--color-line);
+      }
+      .danger .btn {
+        justify-content: start;
+        padding-inline: 0;
+      }
+
+      @media (max-width: 1000px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .stats {
+          grid-template-columns: 1fr 1fr;
+          gap: var(--s-6);
+        }
+        .slip {
+          flex-wrap: wrap;
+        }
+        .slip .pw {
+          border: 0;
+          padding: 0;
+        }
+        .sections li {
+          grid-template-columns: 120px 1fr 40px;
+        }
+        .head h1 {
+          font-size: 36px;
+        }
+        .slip {
+          padding: var(--s-4);
+        }
+        .slip .url {
+          flex-basis: 100%;
+          font-size: var(--text-body);
+        }
+        .slip .btn {
+          margin-inline-start: auto;
+        }
+        .sec-title {
+          flex-wrap: wrap;
+        }
+        .plot {
+          gap: 2px;
+        }
+        table {
+          display: block;
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="wordmark" href="dashboard.html">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.75 2.75h7.5l3 3v11.5h-10.5z" /><path d="M12.25 2.75v3h3" /></svg>
+          Vellum
+        </a>
+        <nav aria-label="Main">
+          <a href="dashboard.html" aria-current="page">Documents</a>
+          <a href="#">Activity</a>
+          <a href="#">Settings</a>
+        </nav>
+        <span class="spacer"></span>
+        <span class="avatar" role="img" aria-label="Signed in as Amirali">A</span>
+      </div>
+    </header>
+
+    <main id="main" class="page">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="dashboard.html">Documents</a><span aria-hidden="true">/</span><span aria-current="page">acme-proposal</span>
+      </nav>
+
+      <div class="head">
+        <div>
+          <h1 class="display">Acme Corp — Website redesign proposal</h1>
+          <div class="meta-line">
+            <span class="status status-live"><svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3.5" fill="currentColor" /></svg>Live</span>
+            <span><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2.75" y="6.25" width="8.5" height="5.5" rx="1" /><path d="M4.75 6.25V4.5a2.25 2.25 0 0 1 4.5 0v1.75" /></svg>Password</span>
+            <span><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="7" cy="7" r="4.75" /><path d="M7 4.5V7l1.75 1" stroke-linecap="round" /></svg>Expires Nov 27</span>
+            <span class="badge">MD</span>
+          </div>
+        </div>
+        <div class="head-actions">
+          <a class="btn btn-secondary" href="view-locked.html">Open as reader</a>
+          <a class="btn btn-secondary" href="upload.html">Edit settings</a>
+        </div>
+      </div>
+
+      <div class="slip">
+        <p class="url" id="share-url"><span>https://docs.amirali.dev/p/</span>acme-proposal</p>
+        <p class="pw">Password<b>acme-q4</b></p>
+        <button class="btn btn-primary btn-lg" type="button" aria-describedby="share-url">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.25" y="5.25" width="8" height="8" rx="1.5" /><path d="M10.75 5.25V3.75a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1.5" /></svg>
+          Copy link
+        </button>
+      </div>
+
+      <div class="layout">
+        <div>
+          <section aria-labelledby="views-h">
+            <div class="sec-title">
+              <h2 id="views-h">Views</h2>
+              <p>Last 14 days · Oct 15 – Oct 28</p>
+            </div>
+            <dl class="stats">
+              <div class="stat hero"><dt>Total views</dt><dd>248</dd></div>
+              <div class="stat"><dt>People</dt><dd>61</dd></div>
+              <div class="stat"><dt>Avg. reading time</dt><dd>3:40<small>min</small></dd></div>
+              <div class="stat"><dt>Read to the end</dt><dd>42<small>%</small></dd></div>
+            </dl>
+
+            <div style="margin-top: var(--s-10)">
+              <div class="chart" role="group" aria-label="Views per day, Oct 15 to Oct 28. Peak of 40 on Oct 23." id="chart">
+                <div class="y-axis" aria-hidden="true"></div>
+                <div class="plot"></div>
+                <div class="x-axis" aria-hidden="true"><span>Oct 15</span><span>Oct 21</span><span>Oct 28</span></div>
+              </div>
+              <details class="table-view">
+                <summary>Show as table</summary>
+                <table style="margin-top: var(--s-3); max-width: 320px">
+                  <thead><tr><th scope="col">Day</th><th scope="col" class="r">Views</th></tr></thead>
+                  <tbody id="chart-table"></tbody>
+                </table>
+              </details>
+            </div>
+          </section>
+
+          <section aria-labelledby="sections-h">
+            <div class="sec-title">
+              <h2 id="sections-h">How far people read</h2>
+              <p>Share of readers who reached each section</p>
+            </div>
+            <ol class="sections" id="sections"></ol>
+            <p class="callout">Readers skip ahead to “Timeline &amp; cost”: 58% reach it, more than reach Phase 3 right before it.</p>
+          </section>
+
+          <section aria-labelledby="recent-h">
+            <div class="sec-title">
+              <h2 id="recent-h">Recent views</h2>
+              <a class="btn btn-ghost" href="#">See all 248</a>
+            </div>
+            <table>
+              <thead>
+                <tr><th scope="col">When</th><th scope="col">Visitor</th><th scope="col">Device</th><th scope="col">Read</th><th scope="col" class="r">Time</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>12 min ago</td><td>Berlin, DE</td><td class="secondary">Desktop · Chrome</td><td><div class="depth"><span class="track"><i style="width: 100%"></i></span>100%</div></td><td class="r">6:12</td></tr>
+                <tr><td>2 hours ago</td><td>Berlin, DE</td><td class="secondary">Mobile · Safari</td><td><div class="depth"><span class="track"><i style="width: 64%"></i></span>64%</div></td><td class="r">2:05</td></tr>
+                <tr><td>Yesterday, 18:40</td><td>London, GB</td><td class="secondary">Desktop · Firefox</td><td><div class="depth"><span class="track"><i style="width: 88%"></i></span>88%</div></td><td class="r">4:51</td></tr>
+                <tr><td>Yesterday, 09:12</td><td>Berlin, DE</td><td class="secondary">Desktop · Chrome</td><td><div class="depth"><span class="track"><i style="width: 22%"></i></span>22%</div></td><td class="r">0:48</td></tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+
+        <aside class="side" aria-label="Document details">
+          <div>
+            <h2>Versions</h2>
+            <ul class="versions">
+              <li><span>v3 · acme-proposal.md <span class="badge" style="margin-inline-start: 4px">Live</span></span><span class="when">Today</span></li>
+              <li><span class="secondary">v2 · acme-proposal.md</span><span class="when">Oct 26</span></li>
+              <li><span class="secondary">v1 · proposal-draft.md</span><span class="when">Oct 25</span></li>
+            </ul>
+            <p class="hint" style="margin: var(--s-3) 0">Upload a new file and the link stays the same.</p>
+            <button class="btn btn-secondary" type="button">Upload new version</button>
+          </div>
+
+          <div>
+            <h2>Details</h2>
+            <dl class="details">
+              <dt>Created</dt><dd>Oct 25, 2026</dd>
+              <dt>Size</dt><dd>14 KB · 1,860 words</dd>
+              <dt>Download original</dt><dd>Off</dd>
+              <dt>Search engines</dt><dd>Hidden</dd>
+            </dl>
+          </div>
+
+          <div class="danger">
+            <button class="btn btn-ghost" type="button">Unpublish (keeps the file and stats)</button>
+            <button class="btn btn-ghost" type="button">Delete document…</button>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <a class="mock-nav" href="index.html">← All screens</a>
+
+    <script>
+      // Mockup data. In the app these come from the views table.
+      const views = [4, 9, 31, 22, 14, 8, 6, 12, 40, 28, 19, 11, 26, 18];
+      const max = 40;
+      const day = (i) => `Oct ${15 + i}`;
+
+      const plot = document.querySelector(".plot");
+      const yAxis = document.querySelector(".y-axis");
+      [0, 20, 40].forEach((v) => {
+        const pct = (v / max) * 100;
+        if (v) plot.insertAdjacentHTML("beforeend", `<span class="grid-line" style="bottom:${pct}%"></span>`);
+        yAxis.insertAdjacentHTML("beforeend", `<span style="bottom:${pct}%">${v}</span>`);
+      });
+      views.forEach((v, i) => {
+        const h = `${(v / max) * 100}%`;
+        const peak = v === max;
+        plot.insertAdjacentHTML(
+          "beforeend",
+          `<button class="bar${peak ? " peak" : ""}" type="button" style="--h:${h}" aria-label="${day(i)}: ${v} views">
+             <i style="height:${h}"></i>
+             ${peak ? `<span class="label" aria-hidden="true">${v}</span>` : ""}
+             <span class="tip" aria-hidden="true">${day(i)} · <b>${v}</b> views</span>
+           </button>`
+        );
+      });
+      document.getElementById("chart-table").innerHTML = views
+        .map((v, i) => `<tr><td>${day(i)}</td><td class="r">${v}</td></tr>`)
+        .join("");
+
+      const sections = [
+        ["Where things stand", 100],
+        ["What we will do", 86],
+        ["Phase 1 — Audit", 74],
+        ["Phase 2 — Design", 61],
+        ["Phase 3 — Build", 49],
+        ["Timeline & cost", 58],
+        ["Next steps", 42],
+      ];
+      document.getElementById("sections").innerHTML = sections
+        .map(([name, pct]) => `<li><span>${name.replace("&", "&amp;")}</span><span class="bar-h" style="width:${pct}%"></span><span class="v">${pct}%</span></li>`)
+        .join("");
+    </script>
+  </body>
+</html>

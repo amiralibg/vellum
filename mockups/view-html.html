@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Weft — Seed round</title>
+    <link rel="stylesheet" href="assets/vellum.css" />
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        overflow: hidden;
+        background: #0f1115;
+      }
+      /* In the app this iframe points at a separate origin (usercontent.docs.amirali.dev)
+         with sandbox + CSP, so uploaded scripts can never touch the dashboard session. */
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+
+      /* Vellum's only footprint on an HTML document: one small pill, collapsible. */
+      .pill {
+        position: fixed;
+        inset-inline-end: var(--s-4);
+        bottom: var(--s-4);
+        display: flex;
+        align-items: center;
+        gap: var(--s-1);
+        padding: var(--s-1);
+        border-radius: var(--r-pill);
+        background: var(--color-surface);
+        outline: 1px solid rgb(28 26 23 / 0.12);
+        font-size: var(--text-sm);
+      }
+      .pill .who {
+        display: flex;
+        align-items: center;
+        gap: var(--s-2);
+        padding: 0 var(--s-3) 0 0;
+      }
+      .pill .avatar {
+        width: 28px;
+        height: 28px;
+        font-size: var(--text-xs);
+      }
+      .pill .btn {
+        min-height: 32px;
+        padding: 0 var(--s-3);
+        border-radius: var(--r-pill);
+        font-size: var(--text-sm);
+      }
+      .pill .btn-icon {
+        width: 32px;
+        padding: 0;
+      }
+      .pill[data-collapsed="true"] .who span,
+      .pill[data-collapsed="true"] .act {
+        display: none;
+      }
+      .pill[data-collapsed="true"] .who {
+        padding: 0;
+      }
+      .pill .sep {
+        width: 1px;
+        height: 18px;
+        background: var(--color-line);
+      }
+      .mock-nav {
+        background: var(--paper-50);
+        color: var(--color-ink);
+      }
+    </style>
+  </head>
+  <body>
+    <iframe src="assets/sample-pitch.html" title="Weft — Seed round" sandbox="allow-scripts allow-popups"></iframe>
+
+    <div class="pill" data-collapsed="false">
+      <div class="who">
+        <span class="avatar" aria-hidden="true">A</span>
+        <span>Shared by Amirali</span>
+      </div>
+      <span class="sep act" aria-hidden="true"></span>
+      <a class="btn btn-ghost act" href="#" download>Download</a>
+      <a class="btn btn-ghost act" href="mailto:hello@example.com">Reply</a>
+      <button class="btn btn-ghost btn-icon" type="button" aria-label="Hide sharing bar" aria-expanded="true" id="toggle">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m5 5 6 6M11 5l-6 6" stroke-linecap="round" /></svg>
+      </button>
+    </div>
+
+    <a class="mock-nav" href="index.html">← All screens</a>
+
+    <script>
+      const pill = document.querySelector(".pill");
+      const toggle = document.getElementById("toggle");
+      toggle.addEventListener("click", () => {
+        const collapsed = pill.dataset.collapsed !== "true";
+        pill.dataset.collapsed = collapsed;
+        toggle.setAttribute("aria-expanded", !collapsed);
+        toggle.setAttribute("aria-label", collapsed ? "Show sharing bar" : "Hide sharing bar");
+      });
+    </script>
+  </body>
+</html>
