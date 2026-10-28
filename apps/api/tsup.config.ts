@@ -1,7 +1,8 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/server.ts", "src/scripts/owner-reset.ts"],
+  // Flat names: the image runs `node dist/server.js` and `node dist/owner-reset.js`.
+  entry: { server: "src/server.ts", "owner-reset": "src/scripts/owner-reset.ts" },
   format: ["esm"],
   target: "node22",
   platform: "node",

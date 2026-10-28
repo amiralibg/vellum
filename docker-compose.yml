@@ -1,5 +1,5 @@
 # Local development: Postgres only. Run the apps with `pnpm dev`.
-# The production image (Dockerfile) and Dokploy notes arrive in phase 5.
+# Production runs docker-compose.prod.yml instead (see docs/deploy.md).
 services:
   postgres:
     image: postgres:17-alpine

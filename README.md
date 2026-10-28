@@ -6,10 +6,10 @@ Instead of attaching `proposal.md` or `pitch.html` to an email, you upload it to
 
 ## Status
 
-Phase 4 of 5: Markdown, HTML and zip uploads, publish settings and the `/p/:slug` reader work end to end,
-with password protection, link expiry, versions (upload and restore), unpublish and delete. Uploaded HTML is
-served only from `USERCONTENT_URL`, sandboxed, behind short-lived signed links. Views are counted without
-cookies (see "Analytics" below). The Docker image comes in the next phase.
+The first version is complete: Markdown, HTML and zip uploads, publish settings and the `/p/:slug` reader, with
+password protection, link expiry, versions (upload and restore), unpublish and delete. Uploaded HTML is served
+only from `USERCONTENT_URL`, sandboxed, behind short-lived signed links. Views are counted without cookies
+(see "Analytics" below). It ships as one Docker image; see "Deploy".
 
 ## Development
 
@@ -59,6 +59,16 @@ Every screen has a light theme and a dark theme with a pure black background. Th
 - View tracking without cookies: views, unique readers, reading time, scroll depth per section
 - Markdown rendering with a table of contents, print-to-PDF, and an optional "Reply" button
 - Single owner account
+
+## Deploy
+
+```sh
+docker build -t vellum .    # the API, the reader pages and the dashboard in one image
+```
+
+`docker-compose.prod.yml` runs the image with Postgres. [docs/deploy.md](docs/deploy.md) walks through deploying
+it with Dokploy: DNS for both origins, the Environment tab, domains, backups and the owner reset
+(`node dist/owner-reset.js` in the container).
 
 ## Analytics
 

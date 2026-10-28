@@ -1,0 +1,66 @@
+# Production: Vellum + Postgres, deployed with Dokploy as a "Docker Compose" service (see docs/deploy.md).
+# Every ${VAR} comes from Dokploy's Environment tab. Variables marked :? stop the deploy when missing.
+services:
+  app:
+    build: .
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_URL: ${APP_URL:?Set APP_URL, e.g. https://vellum.amiralibg.xyz}
+      USERCONTENT_URL: ${USERCONTENT_URL:?Set USERCONTENT_URL, e.g. https://usercontent.vellum.amiralibg.xyz}
+      # Traefik is one proxy in front. Make it 2 if Cloudflare proxies in front of Traefik too.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      DATABASE_URL: postgres://vellum:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/vellum
+      DATA_DIR: /data
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      MAX_UNZIPPED_MB: ${MAX_UNZIPPED_MB:-100}
+      MAX_ZIP_FILES: ${MAX_ZIP_FILES:-1000}
+      OWNER_EMAIL: ${OWNER_EMAIL:?Set OWNER_EMAIL}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:?Set OWNER_PASSWORD}
+      OWNER_NAME: ${OWNER_NAME:-Owner}
+      SIGNING_SECRET: ${SIGNING_SECRET:?Set SIGNING_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY}
+    volumes:
+      - vellum-data:/data
+    # No published port: Traefik reaches the app on dokploy-network, at port 8000.
+    expose:
+      - "8000"
+    networks:
+      - default
+      - dokploy-network
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+  postgres:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: vellum
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: vellum
+    # Localhost only, for backups or psql over SSH. Never reachable from outside the VPS.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - vellum-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vellum"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - default
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  vellum-data:
+  vellum-postgres:
