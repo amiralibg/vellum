@@ -92,7 +92,8 @@ docker exec <postgres container> pg_dump -U vellum vellum > vellum-$(date +%F).s
 docker run --rm -v <data volume>:/data -v "$PWD":/out alpine tar czf /out/vellum-data-$(date +%F).tgz -C /data .
 ```
 
-Postgres is also published on `127.0.0.1:5433` on the VPS only, for `psql` over SSH. It isn't reachable from outside.
+Postgres has no published port: only the app reaches it, over the compose network. For a `psql` shell:
+`docker exec -it <postgres container> psql -U vellum vellum`.
 
 ## Owner reset
 

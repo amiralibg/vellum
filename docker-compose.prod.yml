@@ -41,9 +41,8 @@ services:
       POSTGRES_USER: vellum
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_DB: vellum
-    # Localhost only, for backups or psql over SSH. Never reachable from outside the VPS.
-    ports:
-      - "127.0.0.1:5433:5432"
+    # No published port: only the app reaches it, over the compose network. For psql or backups,
+    # use `docker exec` (docs/deploy.md). Publishing a host port can also collide with other apps on the VPS.
     volumes:
       - vellum-postgres:/var/lib/postgresql/data
     healthcheck:
