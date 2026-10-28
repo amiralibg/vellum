@@ -6,9 +6,10 @@
     <meta name="robots" content="noindex" />
     <title>Q3 infrastructure report</title>
     <link rel="stylesheet" href="assets/vellum.css" />
+    <script src="assets/theme.js"></script>
     <style>
       body {
-        background: var(--color-surface);
+        background: var(--color-reader);
       }
       .progress {
         position: fixed;
@@ -86,10 +87,9 @@
 
       /* Markdown output */
       .prose {
-        font-family: var(--font-display);
-        font-size: 19px;
-        line-height: 1.65;
-        font-optical-sizing: auto;
+        font-family: var(--font-ui);
+        font-size: 17px;
+        line-height: 1.7;
       }
       .prose > * + * {
         margin-top: 1.1em;
@@ -99,13 +99,13 @@
       }
       .prose h1 {
         margin-top: var(--s-4);
-        font: 400 clamp(44px, 6vw, 72px) / 1.02 var(--font-display);
-        letter-spacing: -0.035em;
+        font: 700 clamp(40px, 6vw, 68px) / 1 var(--font-display);
+        letter-spacing: -0.05em;
       }
       .prose .dek {
         margin-top: var(--s-6);
-        font-size: 23px;
-        line-height: 1.45;
+        font-size: 20px;
+        line-height: 1.5;
         color: var(--color-text-secondary);
         text-wrap: pretty;
       }
@@ -118,8 +118,8 @@
       }
       .prose h2 {
         margin-top: 2.4em;
-        font: 500 30px / 1.2 var(--font-display);
-        letter-spacing: -0.02em;
+        font: 600 26px / 1.2 var(--font-display);
+        letter-spacing: -0.035em;
         scroll-margin-top: var(--s-12);
       }
       .prose h3 {
@@ -145,15 +145,15 @@
         text-decoration-thickness: from-font;
         text-decoration-skip-ink: auto;
         text-underline-offset: 3px;
-        text-decoration-color: rgb(28 26 23 / 0.35);
+        text-decoration-color: var(--color-underline);
       }
       .prose blockquote {
         margin-inline: 0;
         padding-inline-start: var(--s-6);
         border-inline-start: 2px solid var(--color-ink);
-        font-style: italic;
-        font-size: 22px;
-        line-height: 1.5;
+        font-size: 19px;
+        font-weight: 500;
+        line-height: 1.55;
       }
       .prose code {
         padding: 1px 5px;
@@ -164,8 +164,9 @@
       .prose pre {
         padding: var(--s-5) var(--s-6);
         border-radius: var(--r);
-        background: var(--color-ink);
-        color: var(--paper-100);
+        background: var(--color-code-bg);
+        color: var(--color-code-text);
+        outline: 1px solid var(--color-code-border);
         overflow-x: auto;
         font: 400 var(--text-ui) / 1.65 var(--font-mono);
       }
@@ -175,7 +176,7 @@
         font: inherit;
       }
       .prose pre .c {
-        color: rgb(246 244 239 / 0.5);
+        color: var(--color-code-comment);
       }
       .prose table {
         width: 100%;
@@ -258,9 +259,6 @@
       @media (max-width: 600px) {
         .reader {
           padding-top: var(--s-8);
-        }
-        .prose {
-          font-size: 18px;
         }
         .reader-bar .print {
           display: none;

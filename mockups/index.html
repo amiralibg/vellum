@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Vellum · Design mockups</title>
     <link rel="stylesheet" href="assets/vellum.css" />
+    <script src="assets/theme.js"></script>
     <style>
       .page {
         max-width: 1040px;
@@ -51,8 +52,8 @@
         }
       }
       .screens a {
-        font: 400 28px / 1.15 var(--font-display);
-        letter-spacing: -0.02em;
+        font: 600 24px / 1.2 var(--font-display);
+        letter-spacing: -0.035em;
         text-decoration: none;
       }
       .screens a::after {
@@ -93,11 +94,15 @@
       .rules span {
         color: var(--color-text-secondary);
       }
+      .swatch-title {
+        margin: var(--s-10) 0 var(--s-4);
+        font-size: var(--text-sm);
+        font-weight: 500;
+      }
       .swatches {
         display: flex;
         flex-wrap: wrap;
         gap: var(--s-6);
-        margin-top: var(--s-8);
       }
       .swatch {
         display: grid;
@@ -109,7 +114,7 @@
         width: 96px;
         height: 64px;
         border-radius: var(--r);
-        outline: 1px solid var(--color-line);
+        outline: 1px solid var(--color-line-strong);
       }
       .swatch code {
         font-family: var(--font-mono);
@@ -155,18 +160,27 @@
 
       <h2 class="eyebrow">Design system</h2>
       <ul class="rules">
-        <li><b>Paper, not white</b><span>Warm off-white canvas. Documents sit on a lighter sheet, like paper on a desk.</span></li>
+        <li><b>Two themes, same markup</b><span>Light is a warm off-white canvas. Dark is pure #000. It follows the system setting; the toggle at the bottom left overrides it.</span></li>
         <li><b>One vermilion button per screen</b><span>The accent is only for the main action. It never colors text, borders or icons.</span></li>
-        <li><b>Serif for documents, sans for the app</b><span>Newsreader for titles and reading, Geist for UI, Geist Mono for links.</span></li>
+        <li><b>One typeface</b><span>Geist for everything, set bold and tight for headlines. Geist Mono for links and labels.</span></li>
         <li><b>No shadows</b><span>Surfaces are separated by hairlines and tone. Two radii: 6px and pill.</span></li>
         <li><b>Documents are the imagery</b><span>No illustrations or photos. The only pictures are miniatures of your own pages.</span></li>
       </ul>
+      <p class="swatch-title">Light</p>
       <div class="swatches">
-        <div class="swatch"><i style="background: var(--paper-100)"></i>Canvas<code>#f6f4ef</code></div>
-        <div class="swatch"><i style="background: var(--paper-50)"></i>Sheet<code>#fbfaf7</code></div>
-        <div class="swatch"><i style="background: var(--paper-200)"></i>Sunken<code>#eeebe4</code></div>
-        <div class="swatch"><i style="background: var(--ink-900)"></i>Ink<code>#1c1a17</code></div>
-        <div class="swatch"><i style="background: var(--vermilion-600)"></i>Action<code>#c4432a</code></div>
+        <div class="swatch"><i style="background: #f6f4ef"></i>Canvas<code>#f6f4ef</code></div>
+        <div class="swatch"><i style="background: #fbfaf7"></i>Sheet<code>#fbfaf7</code></div>
+        <div class="swatch"><i style="background: #eeebe4"></i>Sunken<code>#eeebe4</code></div>
+        <div class="swatch"><i style="background: #1c1a17"></i>Ink<code>#1c1a17</code></div>
+        <div class="swatch"><i style="background: #c4432a"></i>Action<code>#c4432a</code></div>
+      </div>
+      <p class="swatch-title">Dark</p>
+      <div class="swatches">
+        <div class="swatch"><i style="background: #000"></i>Canvas<code>#000000</code></div>
+        <div class="swatch"><i style="background: #0b0b0b"></i>Sheet<code>#0b0b0b</code></div>
+        <div class="swatch"><i style="background: #141414"></i>Sunken<code>#141414</code></div>
+        <div class="swatch"><i style="background: #f2f1ee"></i>Ink<code>#f2f1ee</code></div>
+        <div class="swatch"><i style="background: #c4432a"></i>Action<code>#c4432a</code></div>
       </div>
     </main>
   </body>

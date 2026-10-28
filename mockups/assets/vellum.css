@@ -4,13 +4,19 @@
  *  1. No drop shadows on cards or rows. Surfaces separate by hairline or tone.
  *  2. The vermilion accent is only for the one primary action per screen.
  *     Never text, borders, icons, or decoration.
- *  3. No pure #fff page canvas, no gradients, no stock imagery.
+ *  3. Light theme: no pure #fff canvas. Dark theme: pure #000 canvas, always.
+ *     No gradients, no stock imagery.
  *     Imagery stance: documents are shown as typographic page miniatures, nothing else.
  *  4. Two radii only: 6px and pill. Nothing in between.
  *  5. Hierarchy comes from ink alpha, weight and scale. No extra hues for it.
+ *
+ * Themes: light is the default; dark is set with <html data-theme="dark">.
+ * assets/theme.js picks it from localStorage, then prefers-color-scheme.
+ * Components only use the --color-* role tokens, never primitives, so both themes
+ * come from the same markup.
  */
 
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
 
 :root {
   /* primitives */
@@ -38,13 +44,32 @@
   --color-accent: var(--vermilion-600);
   --color-accent-hover: var(--vermilion-700);
   --color-on-accent: #fff;
+  --color-on-ink: var(--paper-50);
   --color-status-live: var(--green-700);
   --color-status-warn: var(--amber-700);
   --color-focus: var(--ink-900);
+  --color-topbar: rgb(246 244 239 / 0.9);
+  --color-placeholder: rgb(28 26 23 / 0.4);
+  --color-underline: rgb(28 26 23 / 0.35);
+  /* data marks (charts, progress, page miniatures) */
+  --color-mark: rgb(28 26 23 / 0.78);
+  --color-mark-strong: var(--ink-900);
+  --color-mark-dim: rgb(28 26 23 / 0.3);
+  --color-mini-line: rgb(28 26 23 / 0.16);
+  --color-mini-block: rgb(28 26 23 / 0.08);
+  /* code blocks stay dark in both themes */
+  --color-code-bg: var(--ink-900);
+  --color-code-text: var(--paper-100);
+  --color-code-comment: rgb(246 244 239 / 0.5);
+  --color-code-border: transparent;
+  /* page behind a document being read: a lighter sheet in light, still #000 in dark */
+  --color-reader: var(--paper-50);
+
+  color-scheme: light;
 
   /* type */
-  --font-display: "Newsreader", Georgia, serif;
   --font-ui: "Geist", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-ui);
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", monospace;
 
   --text-xs: 12px;
@@ -75,6 +100,55 @@
   --r-pill: 999px;
 
   --content: 1200px;
+}
+
+/* Dark: pure black canvas. Surfaces step up in small, even increments; text is a
+   warm off-white so it doesn't glare against #000. */
+:root[data-theme="dark"] {
+  --black: #000;
+  --gray-950: #0b0b0b;
+  --gray-900: #141414;
+  --gray-850: #1c1c1c;
+  --bone-100: #f2f1ee;
+  --green-400: #5cc48a;
+  --amber-400: #e3a53e;
+
+  --color-canvas: var(--black);
+  --color-surface: var(--gray-950);
+  --color-sunken: var(--gray-900);
+  --color-ink: var(--bone-100);
+  --color-on-ink: var(--black);
+  --color-text: var(--bone-100);
+  --color-text-secondary: rgb(242 241 238 / 0.7);
+  --color-text-muted: rgb(242 241 238 / 0.56);
+  --color-line: rgb(255 255 255 / 0.1);
+  --color-line-strong: rgb(255 255 255 / 0.18);
+  --color-hover: rgb(255 255 255 / 0.05);
+  --color-status-live: var(--green-400);
+  --color-status-warn: var(--amber-400);
+  --color-focus: var(--bone-100);
+  --color-topbar: rgb(0 0 0 / 0.8);
+  --color-placeholder: rgb(242 241 238 / 0.38);
+  --color-underline: rgb(242 241 238 / 0.4);
+  --color-mark: rgb(242 241 238 / 0.62);
+  --color-mark-strong: var(--bone-100);
+  --color-mark-dim: rgb(242 241 238 / 0.22);
+  --color-mini-line: rgb(242 241 238 / 0.2);
+  --color-mini-block: rgb(242 241 238 / 0.09);
+  --color-code-bg: var(--gray-950);
+  --color-code-text: var(--bone-100);
+  --color-code-comment: rgb(242 241 238 / 0.5);
+  --color-code-border: var(--color-line);
+  --color-reader: var(--black);
+
+  color-scheme: dark;
+}
+
+/* Kill transitions for the one frame a theme switch happens. */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
 }
 
 *,
@@ -135,7 +209,7 @@ a {
   top: -48px;
   padding: var(--s-2) var(--s-3);
   background: var(--color-ink);
-  color: var(--paper-50);
+  color: var(--color-on-ink);
   border-radius: var(--r);
   z-index: 10;
 }
@@ -167,10 +241,9 @@ a {
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
   text-decoration: none;
   line-height: 1;
 }
@@ -219,7 +292,7 @@ a {
 
 .btn-ink {
   background: var(--color-ink);
-  color: var(--paper-50);
+  color: var(--color-on-ink);
 }
 
 .btn-ghost {
@@ -242,10 +315,10 @@ a {
     background: var(--color-accent-hover);
   }
   .btn-secondary:hover {
-    border-color: rgb(28 26 23 / 0.32);
+    border-color: var(--color-text-muted);
   }
   .btn-ink:hover {
-    background: rgb(28 26 23 / 0.86);
+    opacity: 0.86;
   }
   .btn-ghost:hover {
     background: var(--color-hover);
@@ -287,7 +360,7 @@ a {
   border-color: var(--color-ink);
 }
 .input::placeholder {
-  color: rgb(28 26 23 / 0.4);
+  color: var(--color-placeholder);
 }
 .input[aria-invalid="true"] {
   border-color: var(--color-accent);
@@ -439,7 +512,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: rgb(246 244 239 / 0.9);
+  background: var(--color-topbar);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--color-line);
 }
@@ -516,7 +589,7 @@ a {
   height: 32px;
   border-radius: var(--r-pill);
   background: var(--color-ink);
-  color: var(--paper-50);
+  color: var(--color-on-ink);
   font: 500 var(--text-sm) / 1 var(--font-ui);
 }
 
@@ -535,10 +608,9 @@ a {
 
 .display {
   font-family: var(--font-display);
-  font-weight: 400;
-  font-optical-sizing: auto;
-  line-height: 1.02;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
 }
 
 /* ---------- Page miniature (the document thumbnail) ---------- */
@@ -555,15 +627,15 @@ a {
   overflow: hidden;
 }
 .mini .t {
-  font: 500 6.5px / 1.05 var(--font-display);
-  letter-spacing: -0.02em;
+  font: 600 6px / 1.1 var(--font-display);
+  letter-spacing: -0.03em;
   margin-bottom: 4px;
 }
 .mini .l {
   height: 2px;
   margin-bottom: 3px;
   border-radius: 1px;
-  background: rgb(28 26 23 / 0.16);
+  background: var(--color-mini-line);
 }
 .mini .l.s {
   width: 60%;
@@ -575,39 +647,50 @@ a {
   height: 14px;
   margin: 4px 0;
   border-radius: 1px;
-  background: rgb(28 26 23 / 0.08);
+  background: var(--color-mini-block);
 }
+/* A miniature of a document that is itself dark: fixed colors, not themed. */
 .mini.dark {
-  background: var(--color-ink);
-  color: var(--paper-50);
-  outline-color: transparent;
+  background: #0f1115;
+  color: #eef0f3;
 }
 .mini.dark .l {
-  background: rgb(251 250 247 / 0.24);
+  background: rgb(238 240 243 / 0.24);
 }
 .mini.dark .big {
-  font: 400 15px / 1 var(--font-display);
-  letter-spacing: -0.03em;
+  font: 700 14px / 1 var(--font-display);
+  letter-spacing: -0.05em;
   margin: 6px 0 4px;
 }
 
 /* ---------- Mockup-only chrome ---------- */
 
-.mock-nav {
+.mock-bar {
   position: fixed;
   inset-inline-start: var(--s-4);
   bottom: var(--s-4);
   z-index: 50;
+  display: flex;
+  gap: var(--s-2);
+}
+
+.mock-nav {
   display: inline-flex;
+  border: 0;
+  cursor: pointer;
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-pill);
   background: var(--color-ink);
-  color: var(--paper-50);
+  color: var(--color-on-ink);
   font: 500 var(--text-xs) / 1 var(--font-mono);
   letter-spacing: 0.02em;
   text-decoration: none;
+}
+.mock-nav svg {
+  width: 12px;
+  height: 12px;
 }
 
 @media (prefers-reduced-motion: reduce) {

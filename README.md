@@ -12,6 +12,8 @@ Design phase. The only thing in the repo right now is a set of static HTML mocku
 open mockups/index.html
 ```
 
+Every screen has a light theme and a dark theme with a pure black background. They follow the OS setting by default; the toggle in the bottom-left corner overrides it (saved in localStorage).
+
 | Screen | File |
 | --- | --- |
 | Sign in | `mockups/login.html` |

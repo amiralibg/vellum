@@ -6,6 +6,7 @@
     <meta name="robots" content="noindex" />
     <title>Weft — Seed round</title>
     <link rel="stylesheet" href="assets/vellum.css" />
+    <script src="assets/theme.js"></script>
     <style>
       html,
       body {
@@ -35,7 +36,7 @@
         padding: var(--s-1);
         border-radius: var(--r-pill);
         background: var(--color-surface);
-        outline: 1px solid rgb(28 26 23 / 0.12);
+        outline: 1px solid var(--color-line-strong);
         font-size: var(--text-sm);
       }
       .pill .who {
@@ -71,9 +72,12 @@
         height: 18px;
         background: var(--color-line);
       }
+      /* The page behind is the author's own (dark) design, so the mock chrome
+         uses surface colors to stay visible in both themes. */
       .mock-nav {
-        background: var(--paper-50);
-        color: var(--color-ink);
+        background: var(--color-surface);
+        color: var(--color-text);
+        outline: 1px solid var(--color-line-strong);
       }
     </style>
   </head>
