@@ -1,0 +1,26 @@
+# Local development: Postgres only. Run the apps with `pnpm dev`.
+# The production image (Dockerfile) and Dokploy notes arrive in phase 5.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: vellum
+      POSTGRES_PASSWORD: vellum
+      POSTGRES_DB: vellum
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/create-test-db.sql:/docker-entrypoint-initdb.d/create-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vellum"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+volumes:
+  postgres-data:

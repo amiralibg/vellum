@@ -6,3 +6,5 @@ dist/
 .DS_Store
 uploads/
 *.log
+data/
+apps/api/public/reader/reader.css

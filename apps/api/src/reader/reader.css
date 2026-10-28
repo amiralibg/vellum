@@ -1,0 +1,549 @@
+/* Reader pages (Markdown reader, gate, expired, 404). Built with the Tailwind CLI into
+   public/reader/reader.css. Styles are ported from mockups/view-markdown.html and
+   mockups/view-locked.html. */
+@import "tailwindcss";
+@import "../../../../packages/ui/theme.css";
+@source "./";
+
+@font-face {
+  font-family: "Geist";
+  src: url("/assets/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer components {
+  body.is-reader {
+    background: var(--color-reader);
+  }
+
+  .progress {
+    position: fixed;
+    inset: 0 0 auto;
+    height: 2px;
+    z-index: 10;
+    background: var(--color-ink);
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+  }
+
+  .reader-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: var(--s-5) var(--s-6);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+  .reader-bar .who {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+  }
+  .reader-bar .who b {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+  .reader-bar .avatar {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-xs);
+  }
+  .reader-actions {
+    display: flex;
+    gap: var(--s-2);
+  }
+
+  .reader {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 680px) 200px;
+    justify-content: center;
+    gap: var(--s-12);
+    padding: var(--s-16) var(--s-6) var(--s-24);
+  }
+
+  .toc {
+    position: sticky;
+    top: var(--s-12);
+    align-self: start;
+    font-size: var(--text-sm);
+  }
+  .toc p {
+    margin-bottom: var(--s-3);
+  }
+  .toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-inline-start: 1px solid var(--color-line);
+  }
+  .toc a {
+    display: block;
+    margin-inline-start: -1px;
+    padding: 6px 0 6px var(--s-3);
+    border-inline-start: 1px solid transparent;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    line-height: 1.35;
+    transition:
+      color 120ms ease-out,
+      border-color 120ms ease-out;
+  }
+  .toc a[aria-current="true"] {
+    color: var(--color-text);
+    border-color: var(--color-ink);
+  }
+  @media (hover: hover) {
+    .toc a:hover {
+      color: var(--color-text);
+    }
+  }
+
+  /* Markdown output */
+  .prose {
+    font-family: var(--font-ui);
+    font-size: 17px;
+    line-height: 1.7;
+    overflow-wrap: break-word;
+  }
+  .prose > * + * {
+    margin-top: 1.1em;
+  }
+  .prose .eyebrow {
+    font-family: var(--font-mono);
+  }
+  .prose h1 {
+    margin-top: var(--s-4);
+    font: 700 clamp(40px, 6vw, 68px) / 1 var(--font-display);
+    letter-spacing: -0.05em;
+  }
+  .prose > .eyebrow + h1 {
+    margin-top: var(--s-4);
+  }
+  .prose > h1:first-child {
+    margin-top: 0;
+  }
+  .prose .dek {
+    margin-top: var(--s-6);
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+    text-wrap: pretty;
+  }
+  .prose .byline {
+    margin-top: var(--s-8);
+    padding-bottom: var(--s-10);
+    border-bottom: 1px solid var(--color-line);
+    font: 400 var(--text-sm) / 1.5 var(--font-ui);
+    color: var(--color-text-muted);
+  }
+  .prose h2 {
+    margin-top: 2.4em;
+    font: 600 26px / 1.2 var(--font-display);
+    letter-spacing: -0.035em;
+    scroll-margin-top: var(--s-12);
+  }
+  .prose h3 {
+    margin-top: 1.8em;
+    font: 600 var(--text-body) / 1.4 var(--font-ui);
+    scroll-margin-top: var(--s-12);
+  }
+  .prose h4,
+  .prose h5,
+  .prose h6 {
+    margin-top: 1.6em;
+    font: 600 var(--text-ui) / 1.4 var(--font-ui);
+  }
+  .prose h2 + *,
+  .prose h3 + * {
+    margin-top: 0.6em;
+  }
+  .prose ul,
+  .prose ol {
+    padding-inline-start: 1.2em;
+  }
+  .prose ul {
+    list-style: disc;
+  }
+  .prose ol {
+    list-style: decimal;
+  }
+  .prose li + li {
+    margin-top: 0.35em;
+  }
+  .prose li > ul,
+  .prose li > ol {
+    margin-top: 0.35em;
+  }
+  .prose li::marker {
+    color: var(--color-text-muted);
+  }
+  .prose .contains-task-list {
+    list-style: none;
+    padding-inline-start: 0;
+  }
+  .prose .task-list-item input {
+    margin: 0 var(--s-2) 0 0;
+    accent-color: var(--color-ink);
+    vertical-align: -1px;
+  }
+  .prose a {
+    text-decoration-line: underline;
+    text-decoration-thickness: from-font;
+    text-decoration-skip-ink: auto;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--color-underline);
+  }
+  .prose blockquote {
+    margin-inline: 0;
+    padding-inline-start: var(--s-6);
+    border-inline-start: 2px solid var(--color-ink);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.55;
+  }
+  .prose blockquote > * + * {
+    margin-top: 0.8em;
+  }
+  .prose code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--color-sunken);
+    font: 400 0.82em / 1 var(--font-mono);
+  }
+  .prose pre {
+    padding: var(--s-5) var(--s-6);
+    border-radius: var(--r);
+    background: var(--color-code-bg);
+    color: var(--color-code-text);
+    outline: 1px solid var(--color-code-border);
+    overflow-x: auto;
+    font: 400 var(--text-ui) / 1.65 var(--font-mono);
+  }
+  .prose pre code {
+    padding: 0;
+    background: none;
+    font: inherit;
+  }
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--r);
+    outline: 1px solid var(--color-line);
+  }
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font: 400 var(--text-ui) / 1.45 var(--font-ui);
+    font-variant-numeric: tabular-nums;
+  }
+  .prose .table-wrap {
+    overflow-x: auto;
+  }
+  .prose th {
+    text-align: start;
+    padding: var(--s-2) var(--s-3) var(--s-2) 0;
+    border-bottom: 1px solid var(--color-line-strong);
+    font-weight: 600;
+  }
+  .prose td {
+    padding: var(--s-3) var(--s-3) var(--s-3) 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .prose th[align="right"],
+  .prose td[align="right"] {
+    text-align: end;
+    padding-inline-end: 0;
+  }
+  .prose th[align="center"],
+  .prose td[align="center"] {
+    text-align: center;
+  }
+  .prose hr {
+    height: auto;
+    margin: 3em 0;
+    border: 0;
+    text-align: center;
+  }
+  .prose hr::after {
+    content: "· · ·";
+    color: var(--color-text-muted);
+    letter-spacing: 0.6em;
+  }
+  .prose .footnotes {
+    margin-top: var(--s-12);
+    padding-top: var(--s-6);
+    border-top: 1px solid var(--color-line);
+    font-size: var(--text-ui);
+    color: var(--color-text-secondary);
+  }
+  .prose .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Syntax highlighting: one ink, varied by alpha and weight (Don't 5: no extra hues). */
+  .prose .hljs-comment,
+  .prose .hljs-quote {
+    color: var(--color-code-comment);
+  }
+  .prose .hljs-keyword,
+  .prose .hljs-selector-tag,
+  .prose .hljs-built_in,
+  .prose .hljs-title,
+  .prose .hljs-section,
+  .prose .hljs-attr {
+    font-weight: 500;
+  }
+  .prose .hljs-string,
+  .prose .hljs-number,
+  .prose .hljs-literal,
+  .prose .hljs-punctuation,
+  .prose .hljs-meta {
+    opacity: 0.78;
+  }
+
+  .side-note {
+    position: sticky;
+    top: var(--s-12);
+    align-self: start;
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+  .side-note .eyebrow {
+    margin-bottom: var(--s-2);
+  }
+
+  .end {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-6);
+    flex-wrap: wrap;
+    margin-top: var(--s-16);
+    padding: var(--s-6) 0;
+    border-top: 1px solid var(--color-ink);
+    font-family: var(--font-ui);
+  }
+  .end .btn {
+    text-decoration: none;
+  }
+  .end p {
+    font-size: var(--text-body);
+  }
+  .end p span {
+    display: block;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .colophon {
+    padding: 0 var(--s-6) var(--s-12);
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 1180px) {
+    .reader {
+      grid-template-columns: minmax(0, 680px);
+    }
+    .toc,
+    .side-note {
+      display: none;
+    }
+  }
+  @media (max-width: 600px) {
+    .reader {
+      padding-top: var(--s-8);
+    }
+    .reader-bar .print {
+      display: none;
+    }
+  }
+  @media print {
+    .reader-bar,
+    .toc,
+    .side-note,
+    .progress,
+    .end .btn {
+      display: none;
+    }
+    .reader {
+      display: block;
+      padding: 0;
+    }
+  }
+
+  /* HTML documents (mockups/view-html.html): the author's page fills the window. */
+  html:has(body.is-site),
+  body.is-site {
+    height: 100%;
+  }
+  body.is-site {
+    overflow: hidden;
+  }
+  .site-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  /* Vellum's only footprint on an HTML document: one small pill, collapsible. */
+  .pill {
+    position: fixed;
+    inset-inline-end: var(--s-4);
+    bottom: max(var(--s-4), env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    padding: var(--s-1);
+    border-radius: var(--r-pill);
+    background: var(--color-surface);
+    outline: 1px solid var(--color-line-strong);
+    font-size: var(--text-sm);
+  }
+  .pill .who {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 0 var(--s-3) 0 0;
+    white-space: nowrap;
+  }
+  .pill .avatar {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-xs);
+  }
+  .pill .btn {
+    min-height: 32px;
+    padding: 0 var(--s-3);
+    border-radius: var(--r-pill);
+    font-size: var(--text-sm);
+  }
+  .pill .btn-icon {
+    width: 32px;
+    padding: 0;
+  }
+  /* Collapsed: the avatar stays, so it's still clear whose link this is; the chevron turns to point back out. */
+  .pill[data-collapsed="true"] .who > span:not(.avatar),
+  .pill[data-collapsed="true"] .act {
+    display: none;
+  }
+  .pill[data-collapsed="true"] .who {
+    padding: 0;
+  }
+  .pill [data-pill-toggle] svg {
+    transition: rotate 160ms ease-out;
+  }
+  .pill[data-collapsed="true"] [data-pill-toggle] svg {
+    rotate: 180deg;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pill [data-pill-toggle] svg {
+      transition: none;
+    }
+  }
+  .pill .sep {
+    width: 1px;
+    height: 18px;
+    background: var(--color-line);
+  }
+
+  /* Gate pages: password, expired, 404 (mockups/view-locked.html) */
+  body.is-gate {
+    min-height: 100dvh;
+    display: grid;
+    grid-template-rows: 1fr auto;
+  }
+  .gate-page {
+    display: grid;
+    place-items: center;
+    padding: var(--s-16) var(--s-6);
+  }
+  .gate {
+    width: min(440px, 100%);
+  }
+  .gate > .eyebrow {
+    margin-bottom: var(--s-3);
+  }
+  .gate .mini {
+    width: 72px;
+    margin-bottom: var(--s-8);
+    padding: 9px 8px;
+  }
+  .gate .mini .t {
+    font-size: 8px;
+  }
+  .gate h1 {
+    font-size: 44px;
+  }
+  .gate .sub {
+    margin-top: var(--s-4);
+    font-size: var(--text-body);
+    color: var(--color-text-secondary);
+    text-wrap: pretty;
+  }
+  .gate .address {
+    margin-top: var(--s-6);
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+  .gate form {
+    display: grid;
+    gap: var(--s-4);
+    margin-top: var(--s-8);
+  }
+  .gate .row {
+    display: flex;
+    gap: var(--s-2);
+  }
+  .gate .row .input {
+    flex: 1;
+  }
+  .gate .from {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    margin-top: var(--s-10);
+    padding-top: var(--s-6);
+    border-top: 1px solid var(--color-line);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+  .gate .from .avatar {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-xs);
+  }
+  .gate .from a {
+    margin-inline-start: auto;
+  }
+  @media (max-width: 480px) {
+    .gate .row {
+      flex-direction: column;
+    }
+  }
+  body.is-gate .colophon {
+    padding: var(--s-6);
+  }
+}
