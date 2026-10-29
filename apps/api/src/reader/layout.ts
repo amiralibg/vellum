@@ -50,6 +50,9 @@ export function layout({ meta, nonce, body, readerScript, view }: LayoutOptions)
     <meta name="twitter:card" content="summary" />
     <link rel="preload" href="/assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/assets/reader/reader.css" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script nonce="${nonce}">${raw(THEME_SCRIPT)}</script>
     ${readerScript ? html`<script src="/assets/reader/reader.js" defer></script>` : ""}
   </head>

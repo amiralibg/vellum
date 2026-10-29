@@ -4,10 +4,12 @@ import type { SVGProps } from "react";
 type P = SVGProps<SVGSVGElement>;
 const base = { fill: "none", stroke: "currentColor", "aria-hidden": true } as const;
 
+/** Two translucent sheets, solid where they overlap: vellum on vellum. packages/ui/logo has the files. */
 export const LogoIcon = (p: P) => (
-  <svg viewBox="0 0 20 20" strokeWidth={1.5} {...base} {...p}>
-    <path d="M4.75 2.75h7.5l3 3v11.5h-10.5z" />
-    <path d="M12.25 2.75v3h3" />
+  <svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true" {...p}>
+    <rect x="6" y="4" width="34" height="44" rx="6" fillOpacity={0.28} />
+    <rect x="24" y="16" width="34" height="44" rx="6" fillOpacity={0.55} />
+    <path d="M30 16H40V42A6 6 0 0 1 34 48H24V22A6 6 0 0 1 30 16Z" />
   </svg>
 );
 export const PlusIcon = (p: P) => (
