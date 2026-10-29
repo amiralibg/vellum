@@ -3,7 +3,7 @@ import type { z } from "zod";
 import type { Config } from "../config.js";
 import type { Db } from "../db/index.js";
 import { forbidden, HttpError, unauthorized } from "../errors.js";
-import { isValidSession } from "../services/auth.js";
+import { sessionUser, type SessionUser } from "../services/auth.js";
 
 type Async = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
@@ -14,12 +14,26 @@ export const asyncHandler =
     fn(req, res, next).catch(next);
   };
 
-export function requireOwner(db: Db, config: Config): RequestHandler {
-  return asyncHandler(async (req, _res, next) => {
+/** Lets signed-in users through; `currentUser(res)` says who. */
+export function requireUser(db: Db, config: Config): RequestHandler {
+  return asyncHandler(async (req, res, next) => {
     const token = req.cookies?.[config.sessionCookie] as string | undefined;
-    if (!(await isValidSession(db, token))) throw unauthorized();
+    const user = await sessionUser(db, token);
+    if (!user) throw unauthorized();
+    res.locals.user = user;
     next();
   });
+}
+
+/** After requireUser: admins only. */
+export const requireAdmin: RequestHandler = (_req, res, next) => {
+  next(currentUser(res).isAdmin ? undefined : forbidden("Only admins can do that."));
+};
+
+export function currentUser(res: Response): SessionUser {
+  const user = res.locals.user as SessionUser | undefined;
+  if (!user) throw new Error("currentUser() needs requireUser() in front of the route");
+  return user;
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

@@ -18,13 +18,14 @@ import {
 } from "@vellum/shared";
 import type pg from "pg";
 import type { Config } from "../config.js";
-import type { Db } from "../db/index.js";
+import { transaction, type Db } from "../db/index.js";
 import { badRequest, conflict, HttpError, notFound } from "../errors.js";
 import { renderMarkdown, type RenderedMarkdown } from "./markdown.js";
 import { Encryptor } from "./secrets.js";
 import { ENTRY, extractZip, readSiteMeta, writeSingleHtml } from "./site.js";
 import { isSlugTaken, isValidSlug, uniqueSlug } from "./slug.js";
 import type { Storage } from "./storage.js";
+import { assertWithinLimits } from "./users.js";
 
 export interface UploadedFile {
   originalName: string;
@@ -33,6 +34,7 @@ export interface UploadedFile {
 
 export interface DocumentRow {
   id: string;
+  user_id: string;
   slug: string;
   kind: DocumentKind;
   status: DocumentStatus;
@@ -72,6 +74,8 @@ export interface VersionRow {
 export interface PublicDocument {
   document: DocumentRow;
   version: VersionRow;
+  /** Who shared it: "Shared by …" and the note by the Reply button. */
+  author: { name: string; replyNote: string };
 }
 
 export type ListFilter = "all" | "live" | "drafts" | "expired";
@@ -93,32 +97,36 @@ export class DocumentService {
     this.encryptor = new Encryptor(config.encryptionKey);
   }
 
-  async createFromUpload(file: UploadedFile): Promise<DocumentDetail> {
+  async createFromUpload(userId: string, file: UploadedFile): Promise<DocumentDetail> {
     const type = uploadType(file.originalName);
+    // Refuses early, before unpacking anything; checked again below with the size on disk.
+    await assertWithinLimits(this.db, this.config, userId, { documents: 1, bytes: file.buffer.length });
     const documentId = randomUUID();
     const versionId = randomUUID();
     try {
       const v = await this.ingest(documentId, 1, file, type);
+      const storedBytes = await this.storage.versionBytes(documentId, 1);
       const title = v.title || titleFromFilename(file.originalName);
-      await this.transaction(async (client) => {
+      await transaction(this.db, async (client) => {
+        await assertWithinLimits(client, this.config, userId, { documents: 1, bytes: storedBytes }, { lock: true });
         const slug = await uniqueSlug(this.db, title);
         await client.query(
-          `INSERT INTO documents (id, slug, kind, title, description, eyebrow, current_version_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [documentId, slug, type.kind, title, v.description, v.eyebrow, versionId],
+          `INSERT INTO documents (id, user_id, slug, kind, title, description, eyebrow, current_version_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [documentId, userId, slug, type.kind, title, v.description, v.eyebrow, versionId],
         );
-        await insertVersion(client, documentId, versionId, 1, file, v);
+        await insertVersion(client, documentId, versionId, 1, file, v, storedBytes);
       });
     } catch (err) {
       await this.storage.removeDocument(documentId);
       throw err;
     }
-    return this.get(documentId);
+    return this.get(userId, documentId);
   }
 
   /** A new file under the same link: slug and settings stay, the new version goes live. */
-  async addVersion(id: string, file: UploadedFile): Promise<DocumentDetail> {
-    const doc = await this.row(id);
+  async addVersion(userId: string, id: string, file: UploadedFile): Promise<DocumentDetail> {
+    const doc = await this.row(userId, id);
     const type = uploadType(file.originalName);
     if (type.kind !== doc.kind) {
       throw new HttpError(
@@ -128,6 +136,7 @@ export class DocumentService {
           : "This document is HTML. Upload an .html or .zip file, or upload the Markdown as a new document.",
       );
     }
+    await assertWithinLimits(this.db, this.config, userId, { documents: 0, bytes: file.buffer.length });
     const versionId = randomUUID();
     const { rows } = await this.db.query<{ next: number }>(
       "SELECT COALESCE(max(number), 0) + 1 AS next FROM document_versions WHERE document_id = $1",
@@ -136,8 +145,10 @@ export class DocumentService {
     const number = rows[0]!.next;
     try {
       const v = await this.ingest(id, number, file, type);
-      await this.transaction(async (client) => {
-        await insertVersion(client, id, versionId, number, file, v);
+      const storedBytes = await this.storage.versionBytes(id, number);
+      await transaction(this.db, async (client) => {
+        await assertWithinLimits(client, this.config, userId, { documents: 0, bytes: storedBytes }, { lock: true });
+        await insertVersion(client, id, versionId, number, file, v, storedBytes);
         await client.query(
           `UPDATE documents SET current_version_id = $2, description = $3, eyebrow = $4, updated_at = now()
            WHERE id = $1`,
@@ -148,7 +159,19 @@ export class DocumentService {
       await this.storage.removeVersion(id, number);
       throw err;
     }
-    return this.get(id);
+    return this.get(userId, id);
+  }
+
+  /** Versions from before storage limits have no stored_bytes; measures them on disk. Runs at boot. */
+  async measureUnsizedVersions(): Promise<number> {
+    const { rows } = await this.db.query<{ id: string; document_id: string; number: number }>(
+      "SELECT id, document_id, number FROM document_versions WHERE stored_bytes IS NULL",
+    );
+    for (const r of rows) {
+      const bytes = await this.storage.versionBytes(r.document_id, r.number);
+      await this.db.query("UPDATE document_versions SET stored_bytes = $2 WHERE id = $1", [r.id, bytes]);
+    }
+    return rows.length;
   }
 
   /** Validates an upload and writes it to disk: the original, plus the unpacked site for HTML. */
@@ -175,10 +198,10 @@ export class DocumentService {
     };
   }
 
-  async listVersions(id: string): Promise<VersionListItem[]> {
+  async listVersions(userId: string, id: string): Promise<VersionListItem[]> {
     const doc = await this.db.query<{ current_version_id: string }>(
-      "SELECT current_version_id FROM documents WHERE id = $1",
-      [id],
+      "SELECT current_version_id FROM documents WHERE id = $1 AND user_id = $2",
+      [id, userId],
     );
     const current = doc.rows[0]?.current_version_id;
     if (!current) throw notFound("That document doesn’t exist.");
@@ -190,29 +213,29 @@ export class DocumentService {
   }
 
   /** Makes an earlier version current again. Nothing is deleted, so this can be undone the same way. */
-  async restoreVersion(id: string, versionId: string): Promise<DocumentDetail> {
+  async restoreVersion(userId: string, id: string, versionId: string): Promise<DocumentDetail> {
     const { rowCount } = await this.db.query(
       `UPDATE documents d SET current_version_id = v.id, description = v.description, eyebrow = v.eyebrow, updated_at = now()
        FROM document_versions v
-       WHERE d.id = $1 AND v.id = $2 AND v.document_id = d.id`,
-      [id, versionId],
+       WHERE d.id = $1 AND v.id = $2 AND v.document_id = d.id AND d.user_id = $3`,
+      [id, versionId, userId],
     );
     if (!rowCount) throw notFound("That version doesn’t exist.");
-    return this.get(id);
+    return this.get(userId, id);
   }
 
-  async list(filter: ListFilter, q: string): Promise<Omit<DocumentListResponse, "viewsThisMonth">> {
+  async list(userId: string, filter: ListFilter, q: string): Promise<Omit<DocumentListResponse, "viewsThisMonth">> {
     const conditions: Record<ListFilter, string> = {
       all: "TRUE",
       live: "d.status = 'live' AND (d.expires_at IS NULL OR d.expires_at > now())",
       drafts: "d.status IN ('draft', 'unpublished')",
       expired: "d.status = 'live' AND d.expires_at <= now()",
     };
-    const params: unknown[] = [];
+    const params: unknown[] = [userId];
     let search = "TRUE";
     if (q.trim()) {
       params.push(`%${q.trim().replace(/[\\%_]/g, "\\$&")}%`);
-      search = "(d.title ILIKE $1 OR d.slug ILIKE $1)";
+      search = "(d.title ILIKE $2 OR d.slug ILIKE $2)";
     }
     // All-time totals. People are unique visitors per day, summed, as on the document page.
     const { rows } = await this.db.query<DocumentRow & { views: number; people: number }>(
@@ -222,7 +245,7 @@ export class DocumentService {
          SELECT document_id, count(*)::int AS views, count(DISTINCT day::text || visitor_hash)::int AS people
          FROM views GROUP BY document_id
        ) s ON s.document_id = d.id
-       WHERE ${conditions[filter]} AND ${search} ORDER BY d.updated_at DESC`,
+       WHERE d.user_id = $1 AND ${conditions[filter]} AND ${search} ORDER BY d.updated_at DESC`,
       params,
     );
     const counts = await this.db.query<{ all: number; live: number; drafts: number; expired: number }>(
@@ -230,7 +253,8 @@ export class DocumentService {
               count(*) FILTER (WHERE ${conditions.live})::int AS live,
               count(*) FILTER (WHERE ${conditions.drafts})::int AS drafts,
               count(*) FILTER (WHERE ${conditions.expired})::int AS expired
-       FROM documents d`,
+       FROM documents d WHERE d.user_id = $1`,
+      [userId],
     );
     return {
       documents: rows.map((r) => this.toSummary(r)),
@@ -238,20 +262,20 @@ export class DocumentService {
     };
   }
 
-  async get(id: string): Promise<DocumentDetail> {
+  async get(userId: string, id: string): Promise<DocumentDetail> {
     const { rows } = await this.db.query<DocumentRow & { v: VersionRow }>(
       `SELECT d.*, row_to_json(v) AS v
        FROM documents d JOIN document_versions v ON v.id = d.current_version_id
-       WHERE d.id = $1`,
-      [id],
+       WHERE d.id = $1 AND d.user_id = $2`,
+      [id, userId],
     );
     const row = rows[0];
     if (!row) throw notFound("That document doesn’t exist.");
     return this.toDetail(row, row.v);
   }
 
-  async update(id: string, patch: DocumentSettingsPatch): Promise<DocumentDetail> {
-    const doc = await this.row(id);
+  async update(userId: string, id: string, patch: DocumentSettingsPatch): Promise<DocumentDetail> {
+    const doc = await this.row(userId, id);
     if (patch.slug !== undefined) {
       if (!isValidSlug(patch.slug)) throw badRequest("Choose a different link.", { slug: "That link is reserved." });
       if (await isSlugTaken(this.db, patch.slug, id)) {
@@ -290,10 +314,10 @@ export class DocumentService {
         throw err;
       }
     }
-    return this.get(id);
+    return this.get(userId, id);
   }
 
-  async publish(id: string): Promise<DocumentDetail> {
+  async publish(userId: string, id: string): Promise<DocumentDetail> {
     // Relative expiry presets on a draft start counting when it's first shared.
     const { rowCount } = await this.db.query(
       `UPDATE documents SET
@@ -304,50 +328,61 @@ export class DocumentService {
            ELSE expires_at END,
          published_at = COALESCE(published_at, $2),
          updated_at = now()
-       WHERE id = $1`,
-      [id, new Date()],
+       WHERE id = $1 AND user_id = $3`,
+      [id, new Date(), userId],
     );
     if (!rowCount) throw notFound("That document doesn’t exist.");
-    return this.get(id);
+    return this.get(userId, id);
   }
 
   /** Takes the link down. Files, versions and stats stay, and publishing again brings it back. */
-  async unpublish(id: string): Promise<DocumentDetail> {
-    await this.row(id);
+  async unpublish(userId: string, id: string): Promise<DocumentDetail> {
+    await this.row(userId, id);
     await this.db.query("UPDATE documents SET status = 'unpublished', updated_at = now() WHERE id = $1 AND status = 'live'", [
       id,
     ]);
-    return this.get(id);
+    return this.get(userId, id);
   }
 
-  async remove(id: string): Promise<void> {
-    const { rowCount } = await this.db.query("DELETE FROM documents WHERE id = $1", [id]);
+  async remove(userId: string, id: string): Promise<void> {
+    const { rowCount } = await this.db.query("DELETE FROM documents WHERE id = $1 AND user_id = $2", [id, userId]);
     if (!rowCount) throw notFound("That document doesn’t exist.");
     await this.storage.removeDocument(id);
   }
 
-  /** The live document at `slug`, or null when nothing should be shown there. Expiry is the caller's check. */
+  /**
+   * The live document at `slug`, or null when nothing should be shown there, which includes
+   * every document of a disabled account. Expiry is the caller's check.
+   */
   async findLiveBySlug(slug: string): Promise<PublicDocument | null> {
-    const { rows } = await this.db.query<DocumentRow & { v: VersionRow }>(
-      `SELECT d.*, row_to_json(v) AS v
-       FROM documents d JOIN document_versions v ON v.id = d.current_version_id
+    const { rows } = await this.db.query<DocumentRow & { v: VersionRow; author_name: string; author_note: string }>(
+      `SELECT d.*, row_to_json(v) AS v, u.display_name AS author_name, u.reply_note AS author_note
+       FROM documents d
+       JOIN document_versions v ON v.id = d.current_version_id
+       JOIN users u ON u.id = d.user_id AND u.disabled_at IS NULL
        WHERE d.slug = $1 AND d.status = 'live'`,
       [slug],
     );
     const row = rows[0];
     if (!row) return null;
-    const { v, ...document } = row;
-    return { document, version: { ...v, created_at: new Date(v.created_at) } };
+    const { v, author_name, author_note, ...document } = row;
+    return {
+      document,
+      version: { ...v, created_at: new Date(v.created_at) },
+      author: { name: author_name, replyNote: author_note },
+    };
   }
 
   /** One version of a document, for serving its site files. Null when the version isn't the document's. */
   async findSiteVersion(
     documentId: string,
     versionId: string,
-  ): Promise<(PublicDocument & { currentVersionId: string }) | null> {
+  ): Promise<(Omit<PublicDocument, "author"> & { currentVersionId: string }) | null> {
     const { rows } = await this.db.query<DocumentRow & { v: VersionRow; current_version_id: string }>(
       `SELECT d.*, row_to_json(v) AS v
-       FROM documents d JOIN document_versions v ON v.document_id = d.id
+       FROM documents d
+       JOIN document_versions v ON v.document_id = d.id
+       JOIN users u ON u.id = d.user_id AND u.disabled_at IS NULL
        WHERE d.id = $1 AND v.id = $2 AND d.kind = 'html'`,
       [documentId, versionId],
     );
@@ -358,7 +393,7 @@ export class DocumentService {
   }
 
   /** The preview pane of the Publish settings screen. `frame` is set for HTML documents. */
-  async preview(id: string): Promise<{
+  async preview(userId: string, id: string): Promise<{
     preview: Omit<DocumentPreview, "frameUrl">;
     frame: { versionId: string; entryPath: string } | null;
   }> {
@@ -372,8 +407,8 @@ export class DocumentService {
       entry_path: string | null;
     }>(
       `SELECT d.kind, d.title, d.eyebrow, d.description, v.rendered_html AS html, v.id AS version_id, v.entry_path
-       FROM documents d JOIN document_versions v ON v.id = d.current_version_id WHERE d.id = $1`,
-      [id],
+       FROM documents d JOIN document_versions v ON v.id = d.current_version_id WHERE d.id = $1 AND d.user_id = $2`,
+      [id, userId],
     );
     const row = rows[0];
     if (!row) throw notFound("That document doesn’t exist.");
@@ -384,8 +419,8 @@ export class DocumentService {
     };
   }
 
-  private async row(id: string): Promise<DocumentRow> {
-    const { rows } = await this.db.query<DocumentRow>("SELECT * FROM documents WHERE id = $1", [id]);
+  private async row(userId: string, id: string): Promise<DocumentRow> {
+    const { rows } = await this.db.query<DocumentRow>("SELECT * FROM documents WHERE id = $1 AND user_id = $2", [id, userId]);
     if (!rows[0]) throw notFound("That document doesn’t exist.");
     return rows[0];
   }
@@ -430,20 +465,6 @@ export class DocumentService {
       return { expiry_preset: preset, expires_at: at };
     }
     return { expiry_preset: preset, expires_at: new Date(now.getTime() + PRESET_DAYS[preset]! * DAY_MS) };
-  }
-
-  private async transaction(fn: (client: pg.PoolClient) => Promise<void>): Promise<void> {
-    const client = await this.db.connect();
-    try {
-      await client.query("BEGIN");
-      await fn(client);
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
   }
 
   private toSummary(r: DocumentRow & { views: number; people: number }): DocumentSummary {
@@ -526,12 +547,13 @@ async function insertVersion(
   number: number,
   file: UploadedFile,
   rendered: Ingested,
+  storedBytes: number,
 ): Promise<void> {
   await client.query(
     `INSERT INTO document_versions
        (id, document_id, number, original_name, source_type, size_bytes, word_count, reading_minutes, headings,
-        rendered_html, eyebrow, description, entry_path)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        rendered_html, eyebrow, description, entry_path, stored_bytes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
       versionId,
       documentId,
@@ -546,6 +568,7 @@ async function insertVersion(
       rendered.eyebrow,
       rendered.description,
       rendered.entryPath,
+      storedBytes,
     ],
   );
 }

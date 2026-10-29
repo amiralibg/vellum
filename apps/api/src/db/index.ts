@@ -2,12 +2,15 @@ import pg from "pg";
 import { migrations } from "./migrations.js";
 
 export type Db = pg.Pool;
+/** The pool, or one client inside a transaction. */
+export type Queryable = pg.Pool | pg.PoolClient;
 
 export function createDb(databaseUrl: string): Db {
   return new pg.Pool({ connectionString: databaseUrl, max: 10 });
 }
 
-export async function migrate(db: Db): Promise<void> {
+/** Runs the migrations not applied yet. `list` is for tests that upgrade from an older schema. */
+export async function migrate(db: Db, list = migrations): Promise<void> {
   const client = await db.connect();
   try {
     // One boot at a time, so two replicas can't race on the same migration.
@@ -17,7 +20,7 @@ export async function migrate(db: Db): Promise<void> {
     );
     const { rows } = await client.query<{ name: string }>("SELECT name FROM schema_migrations");
     const applied = new Set(rows.map((r) => r.name));
-    for (const m of migrations) {
+    for (const m of list) {
       if (applied.has(m.name)) continue;
       await client.query("BEGIN");
       try {
@@ -31,6 +34,21 @@ export async function migrate(db: Db): Promise<void> {
     }
   } finally {
     await client.query("SELECT pg_advisory_unlock(7461626)").catch(() => {});
+    client.release();
+  }
+}
+
+export async function transaction<T>(db: Db, fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
     client.release();
   }
 }

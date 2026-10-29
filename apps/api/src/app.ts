@@ -7,12 +7,14 @@ import helmet from "helmet";
 import type { Config } from "./config.js";
 import type { Db } from "./db/index.js";
 import { errorHandler, sameOrigin } from "./middleware/index.js";
+import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
 import { ownerRouter } from "./routes/owner.js";
 import { publicRouter } from "./routes/public.js";
 import { usercontentRouter } from "./routes/usercontent.js";
 import { Analytics } from "./services/analytics.js";
 import { DocumentService } from "./services/documents.js";
+import { Invites } from "./services/invites.js";
 import { SiteTokens } from "./services/site-tokens.js";
 import { Storage } from "./services/storage.js";
 
@@ -29,6 +31,7 @@ export function createApp({ config, db }: AppDeps) {
   const documents = new DocumentService(db, storage, config);
   const siteTokens = new SiteTokens(config);
   const analytics = new Analytics(db, config);
+  const invites = new Invites(db, config);
 
   const app = express();
   app.disable("x-powered-by");
@@ -57,7 +60,11 @@ export function createApp({ config, db }: AppDeps) {
     },
     sameOrigin(config),
     express.json({ limit: "100kb" }),
-    express.Router().use("/auth", authRouter(db, config)).use(ownerRouter(db, config, documents, siteTokens, analytics)),
+    express
+      .Router()
+      .use("/auth", authRouter(db, config, invites))
+      .use("/admin", adminRouter(db, config, invites))
+      .use(ownerRouter(db, config, documents, siteTokens, analytics)),
   );
   appSite.use("/api", (_req, res) => {
     res.status(404).json({ error: { message: "Not found." } });

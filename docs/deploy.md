@@ -40,7 +40,7 @@ TRUST_PROXY=1
 # openssl rand -hex 24 (hex, so it's safe inside the database URL)
 POSTGRES_PASSWORD=
 
-# Created on the first boot only. To change them later, see "Owner reset".
+# The first admin, created on the first boot only. To get back in later, see "Admin reset".
 OWNER_EMAIL=you@amiralibg.xyz
 OWNER_PASSWORD=
 OWNER_NAME=Amirali
@@ -53,6 +53,10 @@ ENCRYPTION_KEY=
 MAX_UPLOAD_MB=20
 MAX_UNZIPPED_MB=100
 MAX_ZIP_FILES=1000
+
+# Each invited user's limits, unless an admin sets their own on the Users page. Admins have none.
+USER_MAX_DOCUMENTS=50
+USER_MAX_STORAGE_MB=500
 ```
 
 A missing required variable stops the deploy with a message naming it. A wrong value stops the app at boot, and the
@@ -74,13 +78,13 @@ Vellum API on :8000 · app https://vellum.amiralibg.xyz · usercontent https://u
 ```
 
 Database migrations run on every boot before the app starts listening. Open `APP_URL` and sign in with
-`OWNER_EMAIL` / `OWNER_PASSWORD`.
+`OWNER_EMAIL` / `OWNER_PASSWORD`. That account is the first admin: invite other people from **Users**.
 
 ## What persists
 
 | Volume | Holds |
 | --- | --- |
-| `vellum-postgres` | The database: documents, versions, settings, views |
+| `vellum-postgres` | The database: accounts, invites, documents, versions, settings, views |
 | `vellum-data` | `DATA_DIR`: uploaded originals and unpacked HTML sites |
 
 Back up both. On the VPS, `docker ps --format '{{.Names}}' | grep vellum` lists the containers and
@@ -95,11 +99,12 @@ docker run --rm -v <data volume>:/data -v "$PWD":/out alpine tar czf /out/vellum
 Postgres has no published port: only the app reaches it, over the compose network. For a `psql` shell:
 `docker exec -it <postgres container> psql -U vellum vellum`.
 
-## Owner reset
+## Admin reset
 
-The owner account is created from the environment on the first boot only. To change the email or password later:
+Someone who forgot their password gets a new one from an admin: **Users → ⋯ → New password link**. Vellum sends
+no email, so the admin passes the link on. When no admin can sign in at all:
 
-1. Change `OWNER_EMAIL` / `OWNER_PASSWORD` in the Environment tab and redeploy.
+1. Set `OWNER_EMAIL` / `OWNER_PASSWORD` in the Environment tab to the account you want back, and redeploy.
 2. Open a terminal in the app container (in Dokploy, the service's terminal for `app`; or over SSH,
    `docker exec -it <app container> sh`, using the name from `docker ps`) and run:
 
@@ -107,12 +112,20 @@ The owner account is created from the environment on the first boot only. To cha
 node dist/owner-reset.js
 ```
 
-It sets the owner's email and password from the environment and signs out every session.
+The account with `OWNER_EMAIL` gets that password, becomes an admin, is enabled if it was disabled, and its sessions
+are signed out. If no account has that email, it creates a new admin. Other accounts aren't touched.
+
+## Upgrading from the single-owner version
+
+The first boot of the multi-user version migrates the database: the owner becomes the first admin, keeping their
+documents, settings and sessions. It then measures each existing version on disk for the storage limits, once
+(the log says `Measured the size on disk of N earlier versions.`). Back up both volumes before you deploy it.
 
 ## When something's wrong
 
 - **502 from Traefik:** the app isn't up. Read the app container's log; an `Invalid environment` block lists what to fix.
 - **"Unknown host":** the request's host matches neither `APP_URL` nor `USERCONTENT_URL`. Check both URLs, and
   that `TRUST_PROXY` counts the proxies in front (1 for Traefik, 2 with Cloudflare proxying too).
+- **Someone's links all say "not found":** an admin disabled their account. Enabling it brings them back.
 - **HTML documents show a blank frame:** the usercontent domain has no certificate yet, or its DNS record is missing.
 - **Health:** the image checks `GET /health` every 30 seconds; `docker ps` shows `healthy` once it answers.

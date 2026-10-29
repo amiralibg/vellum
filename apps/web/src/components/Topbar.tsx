@@ -6,7 +6,11 @@ import { initial } from "../lib/format";
 import { LogoIcon } from "./icons";
 
 export function Topbar({ children, wide }: { children?: ReactNode; wide?: boolean }) {
-  const inSettings = useLocation().pathname.startsWith("/settings");
+  const path = useLocation().pathname;
+  const { data: account } = useMe();
+  // Document pages count as "Documents", as in mockups/document.html.
+  const section = path.startsWith("/settings") ? "settings" : path.startsWith("/users") ? "users" : "documents";
+  const current = (s: typeof section) => (section === s ? "page" : undefined);
   return (
     <header className="topbar">
       <div className="topbar-inner" style={wide ? { maxWidth: "none" } : undefined}>
@@ -15,11 +19,15 @@ export function Topbar({ children, wide }: { children?: ReactNode; wide?: boolea
           Vellum
         </Link>
         <nav aria-label="Main" className="max-[960px]:hidden">
-          {/* Document pages count as "Documents", as in mockups/document.html. */}
-          <Link to="/" aria-current={inSettings ? undefined : "page"}>
+          <Link to="/" aria-current={current("documents")}>
             Documents
           </Link>
-          <Link to="/settings" aria-current={inSettings ? "page" : undefined}>
+          {account?.isAdmin && (
+            <Link to="/users" aria-current={current("users")}>
+              Users
+            </Link>
+          )}
+          <Link to="/settings" aria-current={current("settings")}>
             Settings
           </Link>
         </nav>
@@ -32,10 +40,10 @@ export function Topbar({ children, wide }: { children?: ReactNode; wide?: boolea
 }
 
 export function AccountMenu() {
-  const { data: owner } = useMe();
+  const { data: account } = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
-  const name = owner?.displayName ?? "";
+  const name = account?.displayName ?? "";
   return (
     <Menu.Root>
       <Menu.Trigger className="avatar cursor-pointer border-0" aria-label={`Account menu, signed in as ${name}`}>
@@ -43,7 +51,12 @@ export function AccountMenu() {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content className="menu" align="end" sideOffset={8}>
-          <div className="px-3 py-2 text-sm text-text-muted">{owner?.email}</div>
+          <div className="px-3 py-2 text-sm text-text-muted">{account?.email}</div>
+          {account?.isAdmin && (
+            <Menu.Item className="menu-item" onSelect={() => navigate("/users")}>
+              Users
+            </Menu.Item>
+          )}
           <Menu.Item className="menu-item" onSelect={() => navigate("/settings")}>
             Settings
           </Menu.Item>

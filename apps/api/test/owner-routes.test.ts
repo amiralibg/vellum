@@ -36,7 +36,7 @@ describe("owner-only API", () => {
   it("serves the owner's data once signed in", async () => {
     const c = await signedIn(t.app);
     const res = await c.get("/api/auth/me").expect(200);
-    expect(res.body.owner).toMatchObject({ email: OWNER.email, displayName: "Amirali" });
+    expect(res.body.account).toMatchObject({ email: OWNER.email, displayName: "Amirali", isAdmin: true });
   });
 
   it("stops accepting the session after sign-out, even if the cookie is replayed", async () => {

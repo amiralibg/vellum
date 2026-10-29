@@ -1,16 +1,24 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ownerSettingsSchema, type Owner, type OwnerSettings } from "@vellum/shared";
+import {
+  accountSettingsSchema,
+  passwordChangeSchema,
+  type Account,
+  type AccountSettings,
+  type PasswordChange,
+} from "@vellum/shared";
 import { useForm, useWatch } from "react-hook-form";
 import { useEffect, useRef } from "react";
-import { useMe, useUpdateSettings } from "../../api/hooks";
+import { useChangePassword, useMe, useUpdateSettings } from "../../api/hooks";
 import { FieldError } from "../../components/FieldError";
 import { ErrorIcon } from "../../components/icons";
 import { useToast } from "../../components/Toast";
 import { Topbar } from "../../components/Topbar";
+import { UsageBar, usageLines } from "../../components/Usage";
+import { ApiError } from "../../lib/api";
 import { setThemePreference } from "../../lib/theme";
 
 export function SettingsPage() {
-  const { data: owner } = useMe();
+  const { data: account } = useMe();
   return (
     <>
       <a className="skip-link" href="#main">
@@ -19,7 +27,13 @@ export function SettingsPage() {
       <Topbar />
       <main id="main" className="page">
         <h1 className="display text-h1 max-[960px]:text-[44px]">Settings</h1>
-        {owner && <SettingsForm owner={owner} />}
+        {account && (
+          <>
+            <SettingsForm account={account} />
+            <UsageSection account={account} />
+            <PasswordForm />
+          </>
+        )}
       </main>
     </>
   );
@@ -31,7 +45,7 @@ const THEMES = [
   { value: "dark", label: "Dark" },
 ] as const;
 
-function SettingsForm({ owner }: { owner: Owner }) {
+function SettingsForm({ account }: { account: Account }) {
   const save = useUpdateSettings();
   const toast = useToast();
   const {
@@ -40,17 +54,17 @@ function SettingsForm({ owner }: { owner: Owner }) {
     control,
     formState: { errors, isDirty },
     reset,
-  } = useForm<OwnerSettings>({
-    resolver: zodResolver(ownerSettingsSchema),
-    defaultValues: { displayName: owner.displayName, theme: owner.theme, replyNote: owner.replyNote },
+  } = useForm<AccountSettings>({
+    resolver: zodResolver(accountSettingsSchema),
+    defaultValues: { displayName: account.displayName, theme: account.theme, replyNote: account.replyNote },
   });
 
   // Preview the theme as soon as it's picked; it's saved with the form.
   const theme = useWatch({ control, name: "theme" });
   useEffect(() => setThemePreference(theme), [theme]);
   // Leaving without saving puts the saved theme back.
-  const savedTheme = useRef(owner.theme);
-  savedTheme.current = owner.theme;
+  const savedTheme = useRef(account.theme);
+  savedTheme.current = account.theme;
   useEffect(() => () => setThemePreference(savedTheme.current), []);
 
   return (
@@ -95,7 +109,7 @@ function SettingsForm({ owner }: { owner: Owner }) {
           <FieldError id="name-hint">{errors.displayName.message}</FieldError>
         ) : (
           <p className="hint" id="name-hint">
-            Readers see “Shared by {owner.displayName}” on every document.
+            Readers see “Shared by {account.displayName}” on every document.
           </p>
         )}
       </div>
@@ -118,8 +132,8 @@ function SettingsForm({ owner }: { owner: Owner }) {
 
       <div className="field">
         <span className="label">Sign-in email</span>
-        <p className="mono text-text-secondary">{owner.email}</p>
-        <p className="hint">Change it with OWNER_EMAIL and the owner:reset command on the server.</p>
+        <p className="mono text-text-secondary">{account.email}</p>
+        <p className="hint">You can’t change your email here. An admin can help.</p>
       </div>
 
       {save.isError && (
@@ -132,6 +146,124 @@ function SettingsForm({ owner }: { owner: Owner }) {
       <div>
         <button className="btn btn-primary" type="submit" disabled={save.isPending || !isDirty}>
           Save settings
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function UsageSection({ account }: { account: Account }) {
+  const u = account.usage;
+  const lines = usageLines(u);
+  return (
+    <section className="mt-12 grid max-w-[520px] gap-6" aria-labelledby="usage-h">
+      <h2 id="usage-h" className="group-title">
+        Your space
+      </h2>
+      <dl className="m-0 grid grid-cols-2 gap-6 max-[520px]:grid-cols-1">
+        <div>
+          <dt className="text-sm text-text-secondary">Documents</dt>
+          <dd className="num m-0 mt-1 text-body">{lines.documents}</dd>
+          <UsageBar used={u.documents} max={u.maxDocuments} />
+        </div>
+        <div>
+          <dt className="text-sm text-text-secondary">Storage</dt>
+          <dd className="num m-0 mt-1 text-body">{lines.storage}</dd>
+          <UsageBar used={u.storageBytes} max={u.maxStorageBytes} />
+        </div>
+      </dl>
+      <p className="hint">
+        {account.isAdmin
+          ? "Admins have no limits."
+          : "Storage counts every version of every document. Ask an admin if you need more room."}
+      </p>
+    </section>
+  );
+}
+
+function PasswordForm() {
+  const change = useChangePassword();
+  const toast = useToast();
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    formState: { errors },
+  } = useForm<PasswordChange>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: { currentPassword: "", newPassword: "" },
+  });
+  const fieldError = change.error instanceof ApiError && Object.keys(change.error.fields).length > 0;
+
+  return (
+    <form
+      className="mt-12 grid max-w-[520px] gap-6"
+      aria-labelledby="password-h"
+      noValidate
+      onSubmit={handleSubmit((input) =>
+        change.mutate(input, {
+          onSuccess: () => {
+            reset();
+            toast("Password changed. Other devices were signed out");
+          },
+          onError: (err) => {
+            if (!(err instanceof ApiError)) return;
+            for (const [field, message] of Object.entries(err.fields)) {
+              if (field in input) setError(field as keyof PasswordChange, { message }, { shouldFocus: true });
+            }
+          },
+        }),
+      )}
+    >
+      <h2 id="password-h" className="group-title">
+        Password
+      </h2>
+      <div className="field">
+        <label className="label" htmlFor="current-password">
+          Current password
+        </label>
+        <input
+          className="input"
+          id="current-password"
+          type="password"
+          autoComplete="current-password"
+          aria-invalid={errors.currentPassword ? "true" : undefined}
+          aria-describedby={errors.currentPassword ? "current-password-error" : undefined}
+          {...register("currentPassword")}
+        />
+        {errors.currentPassword && <FieldError id="current-password-error">{errors.currentPassword.message}</FieldError>}
+      </div>
+      <div className="field">
+        <label className="label" htmlFor="new-password">
+          New password
+        </label>
+        <input
+          className="input"
+          id="new-password"
+          type="password"
+          autoComplete="new-password"
+          aria-invalid={errors.newPassword ? "true" : undefined}
+          aria-describedby={errors.newPassword ? "new-password-error" : "new-password-hint"}
+          {...register("newPassword")}
+        />
+        {errors.newPassword ? (
+          <FieldError id="new-password-error">{errors.newPassword.message}</FieldError>
+        ) : (
+          <p className="hint" id="new-password-hint">
+            At least 8 characters. Your other devices are signed out; this one stays signed in.
+          </p>
+        )}
+      </div>
+      {change.isError && !fieldError && (
+        <p className="error" role="alert">
+          <ErrorIcon />
+          {change.error.message}
+        </p>
+      )}
+      <div>
+        <button className="btn btn-secondary" type="submit" disabled={change.isPending}>
+          {change.isPending ? "Changing…" : "Change password"}
         </button>
       </div>
     </form>

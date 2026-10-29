@@ -13,6 +13,9 @@ const envSchema = z
     MAX_UPLOAD_MB: z.coerce.number().positive().default(20),
     MAX_UNZIPPED_MB: z.coerce.number().positive().default(100),
     MAX_ZIP_FILES: z.coerce.number().int().positive().default(1000),
+    // Invited users, unless an admin sets their own. Admins have no limits.
+    USER_MAX_DOCUMENTS: z.coerce.number().int().positive().default(50),
+    USER_MAX_STORAGE_MB: z.coerce.number().int().positive().default(500),
     OWNER_EMAIL: z.email(),
     OWNER_PASSWORD: z.string().min(8, "OWNER_PASSWORD must be at least 8 characters"),
     OWNER_NAME: z.string().min(1).default("Owner"),
@@ -51,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       maxUnzippedBytes: Math.round(e.MAX_UNZIPPED_MB * 1024 * 1024),
       maxFiles: e.MAX_ZIP_FILES,
     },
+    userLimits: { maxDocuments: e.USER_MAX_DOCUMENTS, maxStorageMb: e.USER_MAX_STORAGE_MB },
     owner: { email: e.OWNER_EMAIL.toLowerCase(), password: e.OWNER_PASSWORD, name: e.OWNER_NAME },
     signingSecret: e.SIGNING_SECRET,
     encryptionKey: e.ENCRYPTION_KEY,

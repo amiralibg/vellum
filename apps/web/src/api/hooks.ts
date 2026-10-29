@@ -1,14 +1,23 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  Account,
+  AccountSettings,
+  CreatedInvite,
   DocumentDetail,
   DocumentListResponse,
   DocumentPreview,
   DocumentSettingsPatch,
   DocumentStats,
+  InviteAccept,
+  InviteInfo,
+  InviteItem,
+  IssuedLink,
   LoginInput,
-  Owner,
-  OwnerSettings,
+  PasswordChange,
+  ResetInfo,
   SlugAvailability,
+  UserListResponse,
+  UserPatch,
   VersionListItem,
   ViewsPage,
 } from "@vellum/shared";
@@ -25,18 +34,22 @@ export const keys = {
   slug: (slug: string, except?: string) => ["slug", slug, except] as const,
   stats: (id: string) => ["document", id, "stats"] as const,
   views: (id: string, page: number) => ["document", id, "views", page] as const,
+  users: ["admin", "users"] as const,
+  invites: ["admin", "invites"] as const,
+  invite: (token: string) => ["invite", token] as const,
+  reset: (token: string) => ["reset", token] as const,
 };
 
-/** The owner's zone, so "today", the 14 days and "this month" are their days, not the server's. */
+/** The user's zone, so "today", the 14 days and "this month" are their days, not the server's. */
 const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/** The signed-in owner, or null when signed out. */
+/** The signed-in user, or null when signed out. */
 export function useMe() {
   return useQuery({
     queryKey: keys.me,
     queryFn: async () => {
       try {
-        return (await api.get<{ owner: Owner }>("/auth/me")).data.owner;
+        return (await api.get<{ account: Account }>("/auth/me")).data.account;
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) return null;
         throw err;
@@ -46,11 +59,57 @@ export function useMe() {
   });
 }
 
-export function useLogin() {
+/** After signing in as someone, possibly not who was signed in before: nothing cached may carry over. */
+function useSignedIn() {
   const qc = useQueryClient();
+  return (account: Account) => {
+    qc.clear();
+    qc.setQueryData(keys.me, account);
+  };
+}
+
+export function useLogin() {
+  const onSuccess = useSignedIn();
   return useMutation({
-    mutationFn: async (input: LoginInput) => (await api.post<{ owner: Owner }>("/auth/login", input)).data.owner,
-    onSuccess: (owner) => qc.setQueryData(keys.me, owner),
+    mutationFn: async (input: LoginInput) => (await api.post<{ account: Account }>("/auth/login", input)).data.account,
+    onSuccess,
+  });
+}
+
+/** What the invite page shows; an error when the link no longer works. */
+export function useInviteInfo(token: string) {
+  return useQuery({
+    queryKey: keys.invite(token),
+    queryFn: async () => (await api.get<InviteInfo>(`/auth/invites/${encodeURIComponent(token)}`)).data,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useAcceptInvite(token: string) {
+  const onSuccess = useSignedIn();
+  return useMutation({
+    mutationFn: async (input: InviteAccept) =>
+      (await api.post<{ account: Account }>(`/auth/invites/${encodeURIComponent(token)}`, input)).data.account,
+    onSuccess,
+  });
+}
+
+export function useResetInfo(token: string) {
+  return useQuery({
+    queryKey: keys.reset(token),
+    queryFn: async () => (await api.get<ResetInfo>(`/auth/resets/${encodeURIComponent(token)}`)).data,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useResetPassword(token: string) {
+  const onSuccess = useSignedIn();
+  return useMutation({
+    mutationFn: async (password: string) =>
+      (await api.post<{ account: Account }>(`/auth/resets/${encodeURIComponent(token)}`, { password })).data.account,
+    onSuccess,
   });
 }
 
@@ -116,6 +175,7 @@ export function useUpload() {
     onSuccess: (doc) => {
       qc.setQueryData(keys.document(doc.id), doc);
       void qc.invalidateQueries({ queryKey: ["documents"] });
+      void qc.invalidateQueries({ queryKey: keys.me }); // usage
     },
   });
 }
@@ -160,6 +220,7 @@ export function useDeleteDocument(id: string) {
     onSuccess: () => {
       qc.removeQueries({ queryKey: keys.document(id) });
       void qc.invalidateQueries({ queryKey: ["documents"] });
+      void qc.invalidateQueries({ queryKey: keys.me }); // usage
     },
   });
 }
@@ -179,6 +240,7 @@ function useVersionChanged(id: string) {
     void qc.invalidateQueries({ queryKey: keys.preview(id) });
     void qc.invalidateQueries({ queryKey: keys.versions(id) });
     void qc.invalidateQueries({ queryKey: ["documents"] });
+    void qc.invalidateQueries({ queryKey: keys.me }); // usage
   };
 }
 
@@ -216,7 +278,68 @@ export function useSlugAvailability(slug: string, except?: string) {
 export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (settings: OwnerSettings) => (await api.patch<{ owner: Owner }>("/settings", settings)).data.owner,
-    onSuccess: (owner) => qc.setQueryData(keys.me, owner),
+    mutationFn: async (settings: AccountSettings) =>
+      (await api.patch<{ account: Account }>("/settings", settings)).data.account,
+    onSuccess: (account) => qc.setQueryData(keys.me, account),
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (input: PasswordChange) => {
+      await api.put("/settings/password", input);
+    },
+  });
+}
+
+// --- Admin
+
+export function useUsers() {
+  return useQuery({
+    queryKey: keys.users,
+    queryFn: async () => (await api.get<UserListResponse>("/admin/users")).data,
+  });
+}
+
+export function useUpdateUser(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: UserPatch) => (await api.patch(`/admin/users/${id}`, patch)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.users });
+      // Stepping down yourself changes what you may see.
+      void qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+export function useResetLink(id: string) {
+  return useMutation({
+    mutationFn: async () => (await api.post<IssuedLink>(`/admin/users/${id}/reset-link`)).data,
+  });
+}
+
+export function useInvites() {
+  return useQuery({
+    queryKey: keys.invites,
+    queryFn: async () => (await api.get<InviteItem[]>("/admin/invites")).data,
+  });
+}
+
+export function useCreateInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (note: string) => (await api.post<CreatedInvite>("/admin/invites", { note })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.invites }),
+  });
+}
+
+export function useRevokeInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/admin/invites/${id}`);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.invites }),
   });
 }

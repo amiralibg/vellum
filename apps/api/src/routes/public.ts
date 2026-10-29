@@ -6,7 +6,7 @@ import type { Config } from "../config.js";
 import type { Db } from "../db/index.js";
 import { asyncHandler } from "../middleware/index.js";
 import { beaconSchema, type Analytics } from "../services/analytics.js";
-import { getOwner, isValidSession } from "../services/auth.js";
+import { sessionUser } from "../services/auth.js";
 import { isExpired, type DocumentService, type PublicDocument } from "../services/documents.js";
 import type { Storage } from "../services/storage.js";
 import type { SiteTokens } from "../services/site-tokens.js";
@@ -74,16 +74,14 @@ export function publicRouter(
   const router = Router();
   const unlock = new UnlockCookies(config);
 
-  const sendNotFound = async (res: Response, slug: string) => {
+  const sendNotFound = (res: Response, slug: string) => {
     const nonce = readerHeaders(res, config, true);
-    const owner = await getOwner(db);
     const address = `${config.appHost}/p/${slug}`;
-    res.status(404).type("html").send(notFoundPage({ nonce, address, siteName: owner.displayName }));
+    res.status(404).type("html").send(notFoundPage({ nonce, address, siteName: "Vellum" }));
   };
 
-  const sendLocked = async (res: Response, { document: d }: PublicDocument, status: number, error?: string, attempt?: string) => {
+  const sendLocked = (res: Response, { document: d, author }: PublicDocument, status: number, error?: string, attempt?: string) => {
     const nonce = readerHeaders(res, config, d.noindex);
-    const owner = await getOwner(db);
     res
       .status(status)
       .type("html")
@@ -94,7 +92,7 @@ export function publicRouter(
           title: d.title,
           url: `${config.appOrigin}/p/${d.slug}`,
           noindex: d.noindex,
-          sharer: { name: owner.displayName, replyEmail: d.reply_email },
+          sharer: { name: author.name, replyEmail: d.reply_email },
           error,
           attempt,
         }),
@@ -120,13 +118,12 @@ export function publicRouter(
   const openable = async (req: Request, res: Response): Promise<PublicDocument | null> => {
     const g = await gate(req);
     if (g.state === "missing") {
-      await sendNotFound(res, req.params.slug!);
+      sendNotFound(res, req.params.slug!);
       return null;
     }
     const d = g.found.document;
     if (g.state === "expired") {
       const nonce = readerHeaders(res, config, true);
-      const owner = await getOwner(db);
       res
         .status(410)
         .type("html")
@@ -137,13 +134,13 @@ export function publicRouter(
             expiresAt: d.expires_at!,
             preset: d.expiry_preset,
             noindex: d.noindex,
-            sharer: { name: owner.displayName, replyEmail: d.reply_email },
+            sharer: { name: g.found.author.name, replyEmail: d.reply_email },
           }),
         );
       return null;
     }
     if (g.state === "locked") {
-      await sendLocked(res, g.found, 401);
+      sendLocked(res, g.found, 401);
       return null;
     }
     return g.found;
@@ -154,8 +151,7 @@ export function publicRouter(
     asyncHandler(async (req, res) => {
       const found = await openable(req, res);
       if (!found) return;
-      const { document: d, version: v } = found;
-      const owner = await getOwner(db);
+      const { document: d, version: v, author } = found;
       const nonce = readerHeaders(res, config, d.noindex);
       // Link previews of a password document get the title only.
       const metaDescription = d.access === "password" ? "" : d.description;
@@ -175,7 +171,7 @@ export function publicRouter(
             noindex: d.noindex,
             allowDownload: d.allow_download,
             replyEmail: d.reply_email,
-            owner: { name: owner.displayName },
+            owner: { name: author.name },
             view,
           }),
         );
@@ -197,7 +193,7 @@ export function publicRouter(
           noindex: d.noindex,
           allowDownload: d.allow_download,
           replyEmail: d.reply_email,
-          owner: { name: owner.displayName, replyNote: owner.replyNote },
+          owner: { name: author.name, replyNote: author.replyNote },
           view,
         }),
       );
@@ -270,12 +266,13 @@ export function publicRouter(
       const claims = analytics.readToken(d, body.data.t);
       if (!claims) return res.status(403).end();
 
-      // Accepted but not counted: tracking is off, it's the owner (by their session), or it's a bot.
+      // Accepted but not counted: tracking is off, it's the author (by their session), or it's a bot.
+      // Other signed-in users are readers like anyone else.
       const userAgent = req.get("user-agent") ?? "";
       const counts =
         d.track_views &&
         !isBot(userAgent) &&
-        !(await isValidSession(db, req.cookies?.[config.sessionCookie] as string | undefined));
+        (await sessionUser(db, req.cookies?.[config.sessionCookie] as string | undefined))?.id !== d.user_id;
       if (counts) await analytics.record(claims, d, body.data, { ip: req.ip ?? "", userAgent, country: countryOf(req) });
       res.status(204).end();
     }),

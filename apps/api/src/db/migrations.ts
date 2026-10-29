@@ -110,4 +110,67 @@ CREATE INDEX views_document_created_idx ON views (document_id, created_at DESC);
 CREATE INDEX views_created_idx ON views (created_at);
 `,
   },
+  {
+    // Invite-only accounts. The single owner becomes the first admin, and keeps its sessions and documents.
+    name: "004_users",
+    sql: /* sql */ `
+CREATE TABLE users (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email          text NOT NULL,             -- lowercased
+  password_hash  text NOT NULL,
+  display_name   text NOT NULL,
+  theme          text NOT NULL DEFAULT 'system' CHECK (theme IN ('system', 'light', 'dark')),
+  reply_note     text NOT NULL DEFAULT '',
+  is_admin       boolean NOT NULL DEFAULT false,
+  disabled_at    timestamptz,               -- signed out, and every document answers 404
+  max_documents  integer,                   -- NULL: USER_MAX_DOCUMENTS. Admins have no limits.
+  max_storage_mb integer,                   -- NULL: USER_MAX_STORAGE_MB
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX users_email_idx ON users (email);
+
+INSERT INTO users (email, password_hash, display_name, theme, reply_note, is_admin, created_at)
+SELECT lower(email), password_hash, display_name, theme, reply_note, true, created_at FROM owner;
+
+ALTER TABLE sessions ADD COLUMN user_id uuid REFERENCES users (id) ON DELETE CASCADE;
+UPDATE sessions SET user_id = (SELECT id FROM users LIMIT 1);
+DELETE FROM sessions WHERE user_id IS NULL;
+ALTER TABLE sessions ALTER COLUMN user_id SET NOT NULL;
+CREATE INDEX sessions_user_idx ON sessions (user_id);
+
+ALTER TABLE documents ADD COLUMN user_id uuid REFERENCES users (id);
+UPDATE documents SET user_id = (SELECT id FROM users LIMIT 1);
+ALTER TABLE documents ALTER COLUMN user_id SET NOT NULL;
+CREATE INDEX documents_user_updated_idx ON documents (user_id, updated_at DESC);
+
+-- Bytes on disk: the original plus the unpacked site. NULL until measured (server boot backfills it).
+ALTER TABLE document_versions ADD COLUMN stored_bytes bigint;
+
+DROP TABLE owner;
+
+-- A link anyone can open once to create an account. Only the token's sha256 is kept.
+CREATE TABLE invites (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_hash text NOT NULL UNIQUE,
+  note       text NOT NULL DEFAULT '',     -- who it's for: the invite page greets them by it
+  created_by uuid NOT NULL REFERENCES users (id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at    timestamptz,
+  used_by    uuid REFERENCES users (id),
+  revoked_at timestamptz
+);
+
+-- A one-time link an admin hands to a user who forgot their password. No email is sent.
+CREATE TABLE password_resets (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_hash text NOT NULL UNIQUE,
+  user_id    uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  created_by uuid NOT NULL REFERENCES users (id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at    timestamptz
+);
+`,
+  },
 ];

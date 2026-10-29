@@ -1,13 +1,17 @@
-// Sets the owner's email and password from OWNER_EMAIL / OWNER_PASSWORD and signs out every session.
+// The way back in when no admin can sign in: the account with OWNER_EMAIL becomes an enabled admin with
+// OWNER_PASSWORD (created if there's none), and its sessions are signed out. Other accounts are left alone.
 // Usage: pnpm --filter @vellum/api owner:reset   (in Docker: node dist/owner-reset.js)
 import { loadConfig } from "../config.js";
 import { createDb, migrate } from "../db/index.js";
-import { ensureOwner, resetOwnerPassword } from "../services/auth.js";
+import { resetAdmin } from "../services/auth.js";
 
 const config = loadConfig();
 const db = createDb(config.databaseUrl);
 await migrate(db);
-await ensureOwner(db, config);
-await resetOwnerPassword(db, config.owner.email, config.owner.password);
-console.log(`Owner reset to ${config.owner.email}. All sessions were signed out.`);
+const result = await resetAdmin(db, config.owner.email, config.owner.password, config.owner.name);
+console.log(
+  result === "created"
+    ? `Created admin ${config.owner.email}.`
+    : `Reset ${config.owner.email}: new password, admin, enabled. Its sessions were signed out.`,
+);
 await db.end();

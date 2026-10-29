@@ -138,18 +138,18 @@ export class Analytics {
     return this.salt.value;
   }
 
-  async stats(documentId: string, { now = new Date(), tz = "UTC" }: { now?: Date; tz?: string } = {}): Promise<DocumentStats> {
+  async stats(userId: string, documentId: string, { now = new Date(), tz = "UTC" }: { now?: Date; tz?: string } = {}): Promise<DocumentStats> {
     const zone = timeZone(tz);
     const doc = await this.db.query<{ kind: DocumentRow["kind"]; version_id: string; number: number; headings: Heading[] }>(
       `SELECT d.kind, v.id AS version_id, v.number, v.headings
-       FROM documents d JOIN document_versions v ON v.id = d.current_version_id WHERE d.id = $1`,
-      [documentId],
+       FROM documents d JOIN document_versions v ON v.id = d.current_version_id WHERE d.id = $1 AND d.user_id = $2`,
+      [documentId, userId],
     );
     const d = doc.rows[0];
     if (!d) throw notFound("That document doesn’t exist.");
     const reading = d.kind === "markdown";
 
-    // The window: the last 14 calendar days in the owner's zone, today included.
+    // The window: the last 14 calendar days in the user's zone, today included.
     const today = `($2::timestamptz AT TIME ZONE $3)::date`;
     const from = `((${today} - ${STATS_DAYS - 1})::timestamp AT TIME ZONE $3)`;
     const inWindow = `v.document_id = $1 AND v.created_at >= ${from} AND v.created_at <= $2`;
@@ -209,8 +209,11 @@ export class Analytics {
     };
   }
 
-  async page(documentId: string, page: number): Promise<ViewsPage> {
-    const doc = await this.db.query<{ kind: DocumentRow["kind"] }>("SELECT kind FROM documents WHERE id = $1", [documentId]);
+  async page(userId: string, documentId: string, page: number): Promise<ViewsPage> {
+    const doc = await this.db.query<{ kind: DocumentRow["kind"] }>(
+      "SELECT kind FROM documents WHERE id = $1 AND user_id = $2",
+      [documentId, userId],
+    );
     if (!doc.rows[0]) throw notFound("That document doesn’t exist.");
     const reading = doc.rows[0].kind === "markdown";
     const [rows, total] = await Promise.all([
@@ -244,12 +247,13 @@ export class Analytics {
     return rows;
   }
 
-  /** Views of every document since the start of this month in the owner's zone. */
-  async viewsThisMonth({ now = new Date(), tz = "UTC" }: { now?: Date; tz?: string } = {}): Promise<number> {
+  /** Views of every document of the user since the start of this month in their zone. */
+  async viewsThisMonth(userId: string, { now = new Date(), tz = "UTC" }: { now?: Date; tz?: string } = {}): Promise<number> {
     const { rows } = await this.db.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM views
-       WHERE created_at >= (date_trunc('month', $1::timestamptz AT TIME ZONE $2) AT TIME ZONE $2) AND created_at <= $1`,
-      [now, timeZone(tz)],
+      `SELECT count(*)::int AS n FROM views v JOIN documents d ON d.id = v.document_id
+       WHERE d.user_id = $3
+         AND v.created_at >= (date_trunc('month', $1::timestamptz AT TIME ZONE $2) AT TIME ZONE $2) AND v.created_at <= $1`,
+      [now, timeZone(tz), userId],
     );
     return rows[0]!.n;
   }

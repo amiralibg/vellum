@@ -11,6 +11,8 @@ password protection, link expiry, versions (upload and restore), unpublish and d
 only from `USERCONTENT_URL`, sandboxed, behind short-lived signed links. Views are counted without cookies
 (see "Analytics" below). It ships as one Docker image; see "Deploy".
 
+Accounts are by invite (see "Accounts" below).
+
 ## Development
 
 Needs Node 22+, pnpm and Postgres (local, or `docker compose up -d postgres`).
@@ -22,8 +24,8 @@ pnpm dev                # dashboard on http://localhost:5180, API on :8000
 pnpm test               # integration tests (needs the vellum_test database)
 ```
 
-The owner account is created from `OWNER_EMAIL` / `OWNER_PASSWORD` on first boot. To change it later,
-update the env and run `pnpm --filter @vellum/api owner:reset`.
+The first admin is created from `OWNER_EMAIL` / `OWNER_PASSWORD` on first boot. If no admin can sign in, set
+them to the account you want back and run `pnpm --filter @vellum/api owner:reset`.
 
 | Path | What |
 | --- | --- |
@@ -42,7 +44,7 @@ Every screen has a light theme and a dark theme with a pure black background. Th
 
 | Screen | File |
 | --- | --- |
-| Sign in | `mockups/login.html` |
+| Sign in (also the invite and password link pages) | `mockups/login.html` |
 | Documents (library + drop to upload) | `mockups/dashboard.html` |
 | Publish settings | `mockups/upload.html` |
 | Document detail (link, stats, versions) | `mockups/document.html` |
@@ -58,7 +60,7 @@ Every screen has a light theme and a dark theme with a pure black background. Th
 - Optional expiry date
 - View tracking without cookies: views, unique readers, reading time, scroll depth per section
 - Markdown rendering with a table of contents, print-to-PDF, and an optional "Reply" button
-- Single owner account
+- Invite-only accounts, each with their own private documents
 
 ## Deploy
 
@@ -67,14 +69,31 @@ docker build -t vellum .    # the API, the reader pages and the dashboard in one
 ```
 
 `docker-compose.prod.yml` runs the image with Postgres. [docs/deploy.md](docs/deploy.md) walks through deploying
-it with Dokploy: DNS for both origins, the Environment tab, domains, backups and the owner reset
+it with Dokploy: DNS for both origins, the Environment tab, domains, backups and the admin reset
 (`node dist/owner-reset.js` in the container).
+
+## Accounts
+
+- An admin makes an invite link on the **Users** page and sends it themselves; Vellum sends no email. Whoever opens
+  it first picks their own email, name and password. Invites work once and expire after 7 days. Admins can revoke
+  them before that.
+- Each person sees only their own documents and stats. Admins manage accounts but can't see other people's
+  documents either.
+- Links (`/p/:slug`) are one namespace for everyone: first come, first served.
+- Invited users have limits on documents and storage (every version counts): `USER_MAX_DOCUMENTS` and
+  `USER_MAX_STORAGE_MB`, or the admin's own numbers for that person. Admins have no limits.
+- Admins can make other people admins. There's always at least one enabled admin, and admins can't disable
+  themselves.
+- Disabling an account signs it out and makes every one of its links show "not found" until it's enabled again.
+  Nothing is deleted, and accounts can't be deleted.
+- A forgotten password: an admin makes a one-time password link (valid 24 hours). Using it signs out every device
+  on that account.
 
 ## Analytics
 
 - A view is counted when the reader page sends its first beacon (`POST /p/:slug/beacon`), never when the page is
-  rendered, so link previews in WhatsApp, Slack or email don't count. Bots, headless browsers and the signed-in
-  owner are not counted, and nothing is tracked when a document's "Track views" is off.
+  rendered, so link previews in WhatsApp, Slack or email don't count. Bots, headless browsers and the document's
+  signed-in author are not counted (other signed-in users count as readers), and nothing is tracked when a document's "Track views" is off.
 - The beacon goes through the same gate as the page: a locked, expired or unpublished document refuses it.
 - No cookies and no IP addresses are stored. A visitor is a hash of IP + user agent + a salt that changes every
   day (UTC); salts older than two days are deleted, so visits can't be linked across days.
