@@ -407,8 +407,10 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .input-group .input {
+    min-width: 0;
     border: 0;
     padding-inline-start: 0;
     font-family: var(--font-mono);

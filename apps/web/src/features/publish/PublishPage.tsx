@@ -8,7 +8,7 @@ import {
   type ExpiryPreset,
 } from "@vellum/shared";
 import clsx from "clsx";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router";
 import {
@@ -185,12 +185,12 @@ function PublishForm({ doc }: { doc: DocumentDetail }) {
         </div>
       </header>
 
-      <main className="grid flex-1 grid-cols-[minmax(0,1fr)_420px] max-[1000px]:grid-cols-1">
+      <main className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_420px] max-[1000px]:grid-cols-1">
         <section
           className="border-e border-line bg-sunken px-10 py-8 max-[1000px]:border-e-0 max-[1000px]:border-b max-[1000px]:px-4 max-[1000px]:py-6"
           aria-label="Preview"
         >
-          <div className="mx-auto mb-4 flex max-w-[760px] items-center justify-between">
+          <div className={clsx("mx-auto mb-4 flex items-center justify-between", doc.kind !== "html" && "max-w-[760px]")}>
             <span className="eyebrow">Preview · as your reader sees it</span>
             <div className="segmented" role="radiogroup" aria-label="Preview width">
               <input type="radio" name="w" id="w-desk" checked={width === "desktop"} onChange={() => setWidth("desktop")} />
@@ -200,16 +200,11 @@ function PublishForm({ doc }: { doc: DocumentDetail }) {
             </div>
           </div>
           {doc.kind === "html" ? (
-            <iframe
+            <PreviewFrame
               key={preview.data?.frameUrl ?? "loading"}
               src={preview.data?.frameUrl ?? undefined}
               title={`Preview of ${title || doc.title}`}
-              sandbox="allow-scripts allow-popups"
-              referrerPolicy="no-referrer"
-              className={clsx(
-                "mx-auto block h-[calc(100dvh-180px)] min-h-[520px] w-full rounded-md bg-surface outline outline-line transition-[max-width] duration-200 ease-out max-[1000px]:h-[520px]",
-                width === "desktop" ? "max-w-[760px]" : "max-w-[390px]",
-              )}
+              width={width}
             />
           ) : (
             <article
@@ -228,9 +223,9 @@ function PublishForm({ doc }: { doc: DocumentDetail }) {
           )}
         </section>
 
-        <aside className="flex flex-col bg-canvas" id="settings">
+        <aside className="flex min-w-0 flex-col bg-canvas" id="settings">
           <form
-            className="grid flex-1 content-start gap-6 px-8 pt-8 pb-10"
+            className="grid flex-1 grid-cols-[minmax(0,1fr)] content-start gap-6 px-8 pt-8 pb-10"
             noValidate
             onSubmit={handleSubmit((v) => save(v, isLive ? "save" : "publish"))}
             id="publish-form"
@@ -432,7 +427,10 @@ function PublishForm({ doc }: { doc: DocumentDetail }) {
             <label className="check">
               <input type="checkbox" checked={showReply} onChange={(e) => setShowReply(e.target.checked)} />
               <span>Show a Reply button</span>
-              <span className="hint">Readers can email you from the end of the document.</span>
+              <span className="hint">
+                Opens the reader’s email app with a message to you
+                {doc.kind === "html" ? ", from the bar above the page." : ", from the end of the document."}
+              </span>
             </label>
             {showReply && (
               <div className="field ps-7">
@@ -482,6 +480,48 @@ function PublishForm({ doc }: { doc: DocumentDetail }) {
           </div>
         </aside>
       </main>
+    </div>
+  );
+}
+
+// The desktop preview lays the page out at a real laptop width and scales it down to fit,
+// so breakpoints and proportions match what readers see instead of a tablet-width column.
+const DESKTOP_WIDTH = 1280;
+const MOBILE_WIDTH = 390;
+
+function PreviewFrame({ src, title, width }: { src?: string; title: string; width: "desktop" | "mobile" }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width: w, height: h } = entry!.contentRect;
+      setSize({ w, h });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const frameWidth = width === "desktop" ? DESKTOP_WIDTH : MOBILE_WIDTH;
+  const scale = size.w ? Math.min(1, size.w / frameWidth) : 1;
+  return (
+    <div
+      ref={box}
+      className="relative h-[calc(100dvh-180px)] min-h-[520px] w-full overflow-hidden max-[1000px]:h-[520px]"
+    >
+      <iframe
+        src={src}
+        title={title}
+        sandbox="allow-scripts allow-popups"
+        referrerPolicy="no-referrer"
+        className="absolute top-0 left-1/2 block origin-top rounded-md bg-surface outline outline-line"
+        style={{
+          width: frameWidth,
+          height: size.h ? size.h / scale : "100%",
+          transform: `translateX(-50%) scale(${scale})`,
+        }}
+      />
     </div>
   );
 }
