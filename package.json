@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @vellum/api --filter @vellum/web dev",
     "build": "pnpm --filter @vellum/web build && pnpm --filter @vellum/api build",
-    "test": "pnpm --filter @vellum/api test",
+    "test": "pnpm --filter @vellum/api --filter @vellum/cli test",
+    "cli:install": "pnpm --filter @vellum/cli install-global",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

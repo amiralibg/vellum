@@ -7,14 +7,24 @@ import {
   type PasswordChange,
 } from "@vellum/shared";
 import { useForm, useWatch } from "react-hook-form";
-import { useEffect, useRef } from "react";
-import { useChangePassword, useMe, useUpdateSettings } from "../../api/hooks";
+import { useEffect, useRef, useState } from "react";
+import {
+  useApiTokens,
+  useChangePassword,
+  useCreateApiToken,
+  useMe,
+  useRevokeApiToken,
+  useUpdateSettings,
+} from "../../api/hooks";
+import { CopyField } from "../../components/CopyField";
 import { FieldError } from "../../components/FieldError";
-import { ErrorIcon } from "../../components/icons";
+import { ErrorIcon, PlusIcon } from "../../components/icons";
+import { Modal } from "../../components/Modal";
 import { useToast } from "../../components/Toast";
 import { Topbar } from "../../components/Topbar";
 import { UsageBar, usageLines } from "../../components/Usage";
 import { ApiError } from "../../lib/api";
+import { formatLongDate, formatUpdated } from "../../lib/format";
 import { setThemePreference } from "../../lib/theme";
 
 export function SettingsPage() {
@@ -32,6 +42,7 @@ export function SettingsPage() {
             <SettingsForm account={account} />
             <UsageSection account={account} />
             <PasswordForm />
+            <ApiTokensSection />
           </>
         )}
       </main>
@@ -267,5 +278,144 @@ function PasswordForm() {
         </button>
       </div>
     </form>
+  );
+}
+
+/** Tokens let the `vellum` CLI (and the agents that run it) upload as this account. */
+function ApiTokensSection() {
+  const { data: tokens } = useApiTokens();
+  const revoke = useRevokeApiToken();
+  const toast = useToast();
+  const [creating, setCreating] = useState(false);
+  return (
+    <section className="mt-12 grid max-w-[520px] gap-4" aria-labelledby="tokens-h">
+      <h2 id="tokens-h" className="group-title">
+        API tokens
+      </h2>
+      <p className="hint m-0">
+        The <code className="mono">vellum</code> command line tool uses a token to upload and publish documents as
+        you, so your agents can share a file without you opening Vellum. A token can’t delete documents, see stats or
+        change your account.
+      </p>
+      {tokens && tokens.length > 0 && (
+        <ul className="m-0 list-none border-t border-line p-0">
+          {tokens.map((t) => (
+            <li key={t.id} className="flex flex-wrap items-center justify-between gap-4 border-b border-line py-3">
+              <div>
+                <div className="font-medium">{t.name}</div>
+                <div className="mt-1 text-sm text-text-muted">
+                  Made {formatLongDate(t.createdAt)} ·{" "}
+                  {t.lastUsedAt ? `last used ${formatUpdated(t.lastUsedAt).toLowerCase()}` : "never used"}
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                disabled={revoke.isPending}
+                onClick={() =>
+                  revoke.mutate(t.id, { onSuccess: () => toast(`“${t.name}” revoked. It no longer works`) })
+                }
+              >
+                Revoke<span className="visually-hidden"> token {t.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {revoke.isError && (
+        <p className="error" role="alert">
+          <ErrorIcon />
+          {revoke.error.message}
+        </p>
+      )}
+      <div>
+        <button className="btn btn-secondary" type="button" onClick={() => setCreating(true)}>
+          <PlusIcon />
+          New token
+        </button>
+      </div>
+      <TokenDialog open={creating} onClose={() => setCreating(false)} />
+    </section>
+  );
+}
+
+function TokenDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const create = useCreateApiToken();
+  const [name, setName] = useState("");
+  const [token, setToken] = useState<string | null>(null);
+  const close = () => {
+    onClose();
+    setName("");
+    setToken(null);
+    create.reset();
+  };
+  const nameError = create.error instanceof ApiError ? create.error.fields.name : undefined;
+  return (
+    <Modal open={open} onClose={close} labelledBy="token-h" describedBy="token-d">
+      <h2 id="token-h">{token ? "Copy your token" : "New API token"}</h2>
+      {token ? (
+        <>
+          <p id="token-d">
+            Run <code className="mono">vellum login --url {window.location.origin}</code> and paste it, or set it as{" "}
+            <code className="mono">VELLUM_TOKEN</code>. You won’t see this token again.
+          </p>
+          <div className="mt-6">
+            <CopyField id="token-value" label="Token" url={token} />
+          </div>
+          <form method="dialog" className="actions">
+            <button className="btn btn-ink" type="submit" autoFocus>
+              Done
+            </button>
+          </form>
+        </>
+      ) : (
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            create.mutate(name, { onSuccess: (t) => setToken(t.token) });
+          }}
+        >
+          <p id="token-d">Name it after where it will be used, so you know which one to revoke.</p>
+          <div className="field mt-6">
+            <label className="label" htmlFor="token-name">
+              Name
+            </label>
+            <input
+              className="input"
+              id="token-name"
+              value={name}
+              maxLength={60}
+              placeholder="claude-laptop"
+              autoComplete="off"
+              aria-invalid={nameError ? "true" : undefined}
+              aria-describedby={nameError ? "token-name-error" : "token-name-hint"}
+              onChange={(e) => setName(e.target.value)}
+            />
+            {nameError ? (
+              <FieldError id="token-name-error">{nameError}</FieldError>
+            ) : (
+              <p className="hint" id="token-name-hint">
+                Shown next to every version it uploads, as “via {name.trim() || "claude-laptop"}”.
+              </p>
+            )}
+          </div>
+          {create.isError && !nameError && (
+            <p className="error mt-4" role="alert">
+              <ErrorIcon />
+              {create.error.message}
+            </p>
+          )}
+          <div className="actions">
+            <button className="btn btn-secondary" type="button" onClick={close}>
+              Cancel
+            </button>
+            <button className="btn btn-ink" type="submit" disabled={create.isPending}>
+              {create.isPending ? "Creating…" : "Create token"}
+            </button>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }

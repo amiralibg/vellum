@@ -173,4 +173,23 @@ CREATE TABLE password_resets (
 );
 `,
   },
+  {
+    // API tokens let tools such as the CLI act as an account without its password.
+    name: "005_api_tokens",
+    sql: /* sql */ `
+CREATE TABLE api_tokens (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  name         text NOT NULL,
+  token_hash   text NOT NULL UNIQUE,      -- sha256; the token itself is shown once
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  last_used_at timestamptz
+);
+CREATE INDEX api_tokens_user_idx ON api_tokens (user_id, created_at DESC);
+
+-- The name of the API token that uploaded a version; NULL when it came from the dashboard.
+-- A copy, not a reference, so it survives the token being revoked.
+ALTER TABLE document_versions ADD COLUMN uploaded_via text;
+`,
+  },
 ];

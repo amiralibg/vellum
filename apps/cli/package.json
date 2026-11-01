@@ -1,0 +1,30 @@
+{
+  "name": "@vellum/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Upload Markdown, HTML or a site folder to your Vellum account and get its link.",
+  "type": "module",
+  "bin": {
+    "vellum": "dist/vellum.js"
+  },
+  "files": [
+    "dist",
+    "skill"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "install-global": "pnpm build && npm install -g \"${TMPDIR:-/tmp}/$(npm pack --silent --pack-destination \"${TMPDIR:-/tmp}\")\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vellum/shared": "workspace:*",
+    "fflate": "^0.8.3",
+    "tsup": "^9.0.0",
+    "vitest": "^5.0.5"
+  }
+}

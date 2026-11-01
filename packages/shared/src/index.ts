@@ -184,6 +184,8 @@ export interface VersionSummary {
   sizeBytes: number;
   wordCount: number;
   createdAt: string;
+  /** The name of the API token that uploaded it; null when it came from the dashboard. */
+  uploadedVia: string | null;
 }
 
 export interface VersionListItem extends VersionSummary {
@@ -301,4 +303,56 @@ export interface SlugAvailability {
 
 export interface ApiError {
   error: { message: string; fields?: Record<string, string> };
+}
+
+// --- API tokens and the CLI ----------------------------------------------------
+
+export const apiTokenCreateSchema = z.object({
+  name: z.string().trim().min(1, "Name the token after where it will be used.").max(60, "Use 60 characters or fewer."),
+});
+export type ApiTokenCreate = z.infer<typeof apiTokenCreateSchema>;
+
+export interface ApiTokenItem {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+/** Only returned once, when the token is created. */
+export interface CreatedApiToken extends ApiTokenItem {
+  token: string;
+}
+
+/** Who an API token acts as. */
+export interface WhoAmI {
+  account: { email: string; displayName: string };
+  token: { name: string };
+}
+
+/**
+ * The text fields of an upload from the CLI, sent as multipart form fields next to the file.
+ * With a slug the user already owns, the file becomes a new version of that document.
+ */
+export const pushFieldsSchema = z.object({
+  slug: slugSchema.optional(),
+  title: z.string().trim().min(1, "Give the document a title.").max(200).optional(),
+  password: z
+    .string()
+    .min(DOCUMENT_PASSWORD_MIN, `Use at least ${DOCUMENT_PASSWORD_MIN} characters.`)
+    .max(200, "Use 200 characters or fewer.")
+    .optional(),
+  expiryPreset: expiryPresetSchema.optional(),
+  expiresAt: z.iso.datetime({ offset: true }).optional(),
+  /** "true" keeps it a draft (or leaves its status alone); anything else publishes it. */
+  draft: z.enum(["true", "false"]).optional(),
+});
+export type PushFields = z.infer<typeof pushFieldsSchema>;
+
+export interface PushResult {
+  /** False when the file became a new version of an existing document. */
+  created: boolean;
+  document: DocumentDetail;
+  /** The document's page in the dashboard. */
+  dashboardUrl: string;
 }
