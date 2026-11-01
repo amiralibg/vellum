@@ -2,6 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import type {
   Account,
   AccountSettings,
+  ApiTokenItem,
+  CreatedApiToken,
   CreatedInvite,
   DocumentDetail,
   DocumentListResponse,
@@ -34,6 +36,7 @@ export const keys = {
   slug: (slug: string, except?: string) => ["slug", slug, except] as const,
   stats: (id: string) => ["document", id, "stats"] as const,
   views: (id: string, page: number) => ["document", id, "views", page] as const,
+  tokens: ["settings", "tokens"] as const,
   users: ["admin", "users"] as const,
   invites: ["admin", "invites"] as const,
   invite: (token: string) => ["invite", token] as const,
@@ -289,6 +292,31 @@ export function useChangePassword() {
     mutationFn: async (input: PasswordChange) => {
       await api.put("/settings/password", input);
     },
+  });
+}
+
+export function useApiTokens() {
+  return useQuery({
+    queryKey: keys.tokens,
+    queryFn: async () => (await api.get<{ tokens: ApiTokenItem[] }>("/settings/tokens")).data.tokens,
+  });
+}
+
+export function useCreateApiToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string) => (await api.post<CreatedApiToken>("/settings/tokens", { name })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tokens }),
+  });
+}
+
+export function useRevokeApiToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/settings/tokens/${id}`);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tokens }),
   });
 }
 

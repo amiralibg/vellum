@@ -1,7 +1,12 @@
-import { Router, type Request } from "express";
+import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import {
   accountSettingsSchema,
+  apiTokenCreateSchema,
+  pushFieldsSchema,
+  type ApiTokenCreate,
+  type PushResult,
+  type WhoAmI,
   documentSettingsPatchSchema,
   passwordChangeSchema,
   type AccountSettings,
@@ -14,10 +19,11 @@ import {
 import type { Config } from "../config.js";
 import type { Db } from "../db/index.js";
 import { badRequest } from "../errors.js";
-import { asyncHandler, currentUser, requireUser, validateBody } from "../middleware/index.js";
+import { asyncHandler, currentUser, requireUser, requireUserOrToken, validateBody } from "../middleware/index.js";
 import { changePassword, getAccount, updateAccountSettings } from "../services/auth.js";
 import type { Analytics } from "../services/analytics.js";
-import type { DocumentService, ListFilter } from "../services/documents.js";
+import { createApiToken, listApiTokens, revokeApiToken } from "../services/api-tokens.js";
+import type { DocumentService, ListFilter, UploadedFile } from "../services/documents.js";
 import type { SiteTokens } from "../services/site-tokens.js";
 import { isSlugTaken, isValidSlug } from "../services/slug.js";
 
@@ -35,7 +41,10 @@ export function ownerRouter(
   analytics: Analytics,
 ): Router {
   const router = Router();
-  router.use(requireUser(db, config));
+  // Every route says who may call it: `user` is a dashboard session only; `userOrToken` also
+  // takes an API token. Tokens get only what the CLI needs, so nothing destructive and no account settings.
+  const user = requireUser(db, config);
+  const userOrToken = requireUserOrToken(db, config);
 
   const upload = multer({
     storage: multer.memoryStorage(),
@@ -47,6 +56,7 @@ export function ownerRouter(
 
   router.get(
     "/documents",
+    userOrToken,
     asyncHandler(async (req, res) => {
       const { id: userId } = currentUser(res);
       const filter = (typeof req.query.status === "string" ? req.query.status : "all") as ListFilter;
@@ -60,23 +70,26 @@ export function ownerRouter(
     }),
   );
 
-  const uploadedFile = (req: Request) => {
+  const uploadedFile = (req: Request, res: Response): UploadedFile => {
     if (!req.file) throw badRequest("Choose a file to upload.");
     // multer decodes the multipart filename as latin1.
     const originalName = Buffer.from(req.file.originalname, "latin1").toString("utf8");
-    return { originalName, buffer: req.file.buffer };
+    const via = currentUser(res).token?.name;
+    return { originalName, buffer: req.file.buffer, ...(via ? { uploadedVia: via } : {}) };
   };
 
   router.post(
     "/documents",
+    userOrToken,
     upload.single("file"),
     asyncHandler(async (req, res) => {
-      res.status(201).json(await documents.createFromUpload(currentUser(res).id, uploadedFile(req)));
+      res.status(201).json(await documents.createFromUpload(currentUser(res).id, uploadedFile(req, res)));
     }),
   );
 
   router.get(
     "/documents/:id",
+    userOrToken,
     asyncHandler(async (req, res) => {
       res.json(await documents.get(currentUser(res).id, req.params.id!));
     }),
@@ -84,6 +97,7 @@ export function ownerRouter(
 
   router.patch(
     "/documents/:id",
+    userOrToken,
     validateBody(documentSettingsPatchSchema),
     asyncHandler(async (req, res) => {
       res.json(await documents.update(currentUser(res).id, req.params.id!, req.body as DocumentSettingsPatch));
@@ -92,6 +106,7 @@ export function ownerRouter(
 
   router.post(
     "/documents/:id/publish",
+    userOrToken,
     asyncHandler(async (req, res) => {
       res.json(await documents.publish(currentUser(res).id, req.params.id!));
     }),
@@ -99,6 +114,7 @@ export function ownerRouter(
 
   router.post(
     "/documents/:id/unpublish",
+    user,
     asyncHandler(async (req, res) => {
       res.json(await documents.unpublish(currentUser(res).id, req.params.id!));
     }),
@@ -106,6 +122,7 @@ export function ownerRouter(
 
   router.delete(
     "/documents/:id",
+    user,
     asyncHandler(async (req, res) => {
       await documents.remove(currentUser(res).id, req.params.id!);
       res.status(204).end();
@@ -114,6 +131,7 @@ export function ownerRouter(
 
   router.get(
     "/documents/:id/versions",
+    userOrToken,
     asyncHandler(async (req, res) => {
       res.json(await documents.listVersions(currentUser(res).id, req.params.id!));
     }),
@@ -121,14 +139,16 @@ export function ownerRouter(
 
   router.post(
     "/documents/:id/versions",
+    userOrToken,
     upload.single("file"),
     asyncHandler(async (req, res) => {
-      res.status(201).json(await documents.addVersion(currentUser(res).id, req.params.id!, uploadedFile(req)));
+      res.status(201).json(await documents.addVersion(currentUser(res).id, req.params.id!, uploadedFile(req, res)));
     }),
   );
 
   router.post(
     "/documents/:id/versions/:versionId/restore",
+    user,
     asyncHandler(async (req, res) => {
       res.json(await documents.restoreVersion(currentUser(res).id, req.params.id!, req.params.versionId!));
     }),
@@ -136,6 +156,7 @@ export function ownerRouter(
 
   router.get(
     "/documents/:id/preview",
+    user,
     asyncHandler(async (req, res) => {
       const id = req.params.id!;
       const { preview, frame } = await documents.preview(currentUser(res).id, id);
@@ -148,6 +169,7 @@ export function ownerRouter(
 
   router.get(
     "/documents/:id/stats",
+    user,
     asyncHandler(async (req, res) => {
       res.json(await analytics.stats(currentUser(res).id, req.params.id!, { tz: zoneOf(req) }));
     }),
@@ -155,6 +177,7 @@ export function ownerRouter(
 
   router.get(
     "/documents/:id/views",
+    user,
     asyncHandler(async (req, res) => {
       const page = req.query.page === undefined ? 1 : Number(req.query.page);
       if (!Number.isInteger(page) || page < 1) throw badRequest("Pages start at 1.");
@@ -164,6 +187,7 @@ export function ownerRouter(
 
   router.get(
     "/slugs/:slug",
+    userOrToken,
     asyncHandler(async (req, res) => {
       const slug = req.params.slug!.toLowerCase();
       const except = typeof req.query.except === "string" ? req.query.except : undefined;
@@ -175,8 +199,69 @@ export function ownerRouter(
     }),
   );
 
+  /** The CLI's upload: a file plus optional settings, to a live link in one request. */
+  router.post(
+    "/push",
+    userOrToken,
+    upload.single("file"),
+    asyncHandler(async (req, res) => {
+      const parsed = pushFieldsSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        const fields: Record<string, string> = {};
+        for (const issue of parsed.error.issues) fields[issue.path.join(".") || "_"] ??= issue.message;
+        throw badRequest(Object.values(fields)[0] ?? "Check the upload’s settings.", fields);
+      }
+      const { created, document } = await documents.push(currentUser(res).id, uploadedFile(req, res), parsed.data);
+      const body: PushResult = { created, document, dashboardUrl: `${config.appOrigin}/documents/${document.id}` };
+      res.status(created ? 201 : 200).json(body);
+    }),
+  );
+
+  /** Who an API token acts as, so the CLI can check it. */
+  router.get(
+    "/whoami",
+    userOrToken,
+    asyncHandler(async (_req, res) => {
+      const { id, token } = currentUser(res);
+      const account = await getAccount(db, config, id);
+      const body: WhoAmI = {
+        account: { email: account.email, displayName: account.displayName },
+        token: { name: token?.name ?? "" },
+      };
+      res.json(body);
+    }),
+  );
+
+  router.get(
+    "/settings/tokens",
+    user,
+    asyncHandler(async (_req, res) => {
+      res.json({ tokens: await listApiTokens(db, currentUser(res).id) });
+    }),
+  );
+
+  router.post(
+    "/settings/tokens",
+    user,
+    validateBody(apiTokenCreateSchema),
+    asyncHandler(async (req, res) => {
+      const { name } = req.body as ApiTokenCreate;
+      res.status(201).json(await createApiToken(db, currentUser(res).id, name));
+    }),
+  );
+
+  router.delete(
+    "/settings/tokens/:tokenId",
+    user,
+    asyncHandler(async (req, res) => {
+      await revokeApiToken(db, currentUser(res).id, req.params.tokenId!);
+      res.status(204).end();
+    }),
+  );
+
   router.get(
     "/settings",
+    user,
     asyncHandler(async (_req, res) => {
       res.json({ account: await getAccount(db, config, currentUser(res).id) });
     }),
@@ -184,6 +269,7 @@ export function ownerRouter(
 
   router.patch(
     "/settings",
+    user,
     validateBody(accountSettingsSchema),
     asyncHandler(async (req, res) => {
       res.json({ account: await updateAccountSettings(db, config, currentUser(res).id, req.body as AccountSettings) });
@@ -193,6 +279,7 @@ export function ownerRouter(
   /** Signs out the account's other sessions; this one stays. */
   router.put(
     "/settings/password",
+    user,
     validateBody(passwordChangeSchema),
     asyncHandler(async (req, res) => {
       const { currentPassword, newPassword } = req.body as PasswordChange;

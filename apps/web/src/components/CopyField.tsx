@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckIcon, CopyIcon } from "./icons";
 
 /**
- * A link to hand over by hand (invites, password links), shown once, with a Copy button.
+ * A link or secret to hand over by hand (invites, password links, API tokens), shown once, with a Copy button.
  * It confirms in place: inside a modal <dialog>, the page's toast sits under the backdrop.
  */
 export function CopyField({ id, label, url }: { id: string; label: string; url: string }) {

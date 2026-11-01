@@ -31,6 +31,7 @@ them to the account you want back and run `pnpm --filter @vellum/api owner:reset
 | --- | --- |
 | `apps/api` | Express + Postgres API, and the server-rendered reader pages (`src/reader`) |
 | `apps/web` | Vite + React dashboard |
+| `apps/cli` | The `vellum` command line tool (see "CLI") |
 | `packages/shared` | zod schemas and types shared by both |
 | `packages/ui` | Design tokens and components (`theme.css`, ported from the mockups) and the Geist fonts |
 
@@ -61,6 +62,7 @@ Every screen has a light theme and a dark theme with a pure black background. Th
 - View tracking without cookies: views, unique readers, reading time, scroll depth per section
 - Markdown rendering with a table of contents, print-to-PDF, and an optional "Reply" button
 - Invite-only accounts, each with their own private documents
+- A `vellum` CLI and API tokens, so agents can publish without the dashboard
 
 ## Deploy
 
@@ -88,6 +90,32 @@ it with Dokploy: DNS for both origins, the Environment tab, domains, backups and
   Nothing is deleted, and accounts can't be deleted.
 - A forgotten password: an admin makes a one-time password link (valid 24 hours). Using it signs out every device
   on that account.
+
+## CLI
+
+`vellum` uploads to your account from a terminal, so agents can publish a file and hand you the link without you
+opening Vellum.
+
+```sh
+pnpm cli:install                          # builds it and installs `vellum` globally with npm
+vellum login --url https://docs.yourdomain.com   # paste a token from Settings → API tokens
+vellum upload report.md                   # prints the link and opens it in your browser
+vellum upload report.md --slug q3-report  # a new version under a link you already shared
+vellum upload ./site --password hunter22 --expires 7d   # a folder with an index.html is zipped for you
+vellum install-skill                      # teaches Claude Code agents when and how to use it
+```
+
+- It takes what the dashboard takes: `.md`, `.html`, a `.zip` with an `index.html`, or a folder with an
+  `index.html`. `vellum upload --help` lists every option.
+- Uploads go live straight away, unless `--draft`. With `--slug`, a slug you already use gets a new version (an
+  unpublished document goes live again), a free slug names a new document, and someone else's slug is refused.
+- The link goes to stdout and everything else to stderr; `--json` gives the whole result. `--no-open` skips the
+  browser.
+- `VELLUM_URL` and `VELLUM_TOKEN` override what `vellum login` saved in `~/.config/vellum/config.json`.
+- API tokens act as you, but only on your own documents: they list, upload, add versions, publish and change
+  settings. They can't delete or unpublish, see stats, or touch your account, other tokens or admin pages. They don't
+  expire; revoke them in Settings. A disabled account's tokens stop working. Every version a token uploads shows
+  "via <token name>".
 
 ## Analytics
 

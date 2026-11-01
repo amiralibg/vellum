@@ -12,6 +12,7 @@ import {
   type DocumentStatus,
   type DocumentSummary,
   type ExpiryPreset,
+  type PushFields,
   type Heading,
   type VersionListItem,
   type VersionSummary,
@@ -30,6 +31,8 @@ import { assertWithinLimits } from "./users.js";
 export interface UploadedFile {
   originalName: string;
   buffer: Buffer;
+  /** The name of the API token that sent it; absent for dashboard uploads. */
+  uploadedVia?: string;
 }
 
 export interface DocumentRow {
@@ -67,6 +70,7 @@ export interface VersionRow {
   headings: Heading[];
   rendered_html: string | null;
   entry_path: string | null;
+  uploaded_via: string | null;
   created_at: Date;
 }
 
@@ -97,7 +101,8 @@ export class DocumentService {
     this.encryptor = new Encryptor(config.encryptionKey);
   }
 
-  async createFromUpload(userId: string, file: UploadedFile): Promise<DocumentDetail> {
+  /** A new draft. Its title (and so its slug) comes from `title`, else the file, else the filename. */
+  async createFromUpload(userId: string, file: UploadedFile, givenTitle?: string): Promise<DocumentDetail> {
     const type = uploadType(file.originalName);
     // Refuses early, before unpacking anything; checked again below with the size on disk.
     await assertWithinLimits(this.db, this.config, userId, { documents: 1, bytes: file.buffer.length });
@@ -106,7 +111,7 @@ export class DocumentService {
     try {
       const v = await this.ingest(documentId, 1, file, type);
       const storedBytes = await this.storage.versionBytes(documentId, 1);
-      const title = v.title || titleFromFilename(file.originalName);
+      const title = givenTitle || v.title || titleFromFilename(file.originalName);
       await transaction(this.db, async (client) => {
         await assertWithinLimits(client, this.config, userId, { documents: 1, bytes: storedBytes }, { lock: true });
         const slug = await uniqueSlug(this.db, title);
@@ -160,6 +165,61 @@ export class DocumentService {
       throw err;
     }
     return this.get(userId, id);
+  }
+
+  /**
+   * One step from a file to a shareable link, for the CLI. With a slug the user already owns, the
+   * file becomes that document's new version; a free slug names a new document; a slug owned by
+   * someone else is refused. Then the given settings apply, and the document goes live unless
+   * `draft` is set (a draft upload leaves an existing document's status alone).
+   */
+  async push(userId: string, file: UploadedFile, fields: PushFields): Promise<{ created: boolean; document: DocumentDetail }> {
+    const patch: DocumentSettingsPatch = {};
+    if (fields.title !== undefined) patch.title = fields.title;
+    if (fields.password !== undefined) Object.assign(patch, { access: "password", password: fields.password });
+    if (fields.expiryPreset !== undefined) {
+      if (fields.expiryPreset === "date" && !(fields.expiresAt && new Date(fields.expiresAt).getTime() > Date.now())) {
+        throw badRequest("Check the highlighted fields.", { expiresAt: "Pick a date in the future." });
+      }
+      Object.assign(patch, { expiryPreset: fields.expiryPreset, expiresAt: fields.expiresAt ?? null });
+    }
+
+    let id: string;
+    let created = false;
+    if (fields.slug !== undefined) {
+      if (!isValidSlug(fields.slug)) throw badRequest("Choose a different link.", { slug: "That link is reserved." });
+      const { rows } = await this.db.query<{ id: string; user_id: string }>(
+        "SELECT id, user_id FROM documents WHERE slug = $1",
+        [fields.slug],
+      );
+      const existing = rows[0];
+      if (existing && existing.user_id !== userId) {
+        throw conflict("That link is taken by someone else’s document. Choose another slug.", {
+          slug: "Another account already uses this link.",
+        });
+      }
+      if (existing) {
+        id = existing.id;
+        await this.addVersion(userId, id, file);
+      } else {
+        id = (await this.createFromUpload(userId, file, fields.title)).id;
+        created = true;
+        patch.slug = fields.slug;
+      }
+    } else {
+      id = (await this.createFromUpload(userId, file, fields.title)).id;
+      created = true;
+    }
+
+    try {
+      if (Object.keys(patch).length) await this.update(userId, id, patch);
+      if (fields.draft !== "true") await this.publish(userId, id);
+    } catch (err) {
+      // A new document that can't take its settings (say, the slug was taken a moment ago) isn't left behind.
+      if (created) await this.remove(userId, id);
+      throw err;
+    }
+    return { created, document: await this.get(userId, id) };
   }
 
   /** Versions from before storage limits have no stored_bytes; measures them on disk. Runs at boot. */
@@ -515,6 +575,7 @@ function toVersionSummary(v: VersionRow): VersionSummary {
     sizeBytes: v.size_bytes,
     wordCount: v.word_count,
     createdAt: new Date(v.created_at).toISOString(),
+    uploadedVia: v.uploaded_via ?? null,
   };
 }
 
@@ -552,8 +613,8 @@ async function insertVersion(
   await client.query(
     `INSERT INTO document_versions
        (id, document_id, number, original_name, source_type, size_bytes, word_count, reading_minutes, headings,
-        rendered_html, eyebrow, description, entry_path, stored_bytes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        rendered_html, eyebrow, description, entry_path, stored_bytes, uploaded_via)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [
       versionId,
       documentId,
@@ -569,6 +630,7 @@ async function insertVersion(
       rendered.description,
       rendered.entryPath,
       storedBytes,
+      file.uploadedVia ?? null,
     ],
   );
 }

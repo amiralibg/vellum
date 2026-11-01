@@ -166,6 +166,7 @@ function Versions({ doc }: { doc: DocumentDetail }) {
             <span className={clsx("min-w-0 [overflow-wrap:anywhere]", !v.current && "text-text-secondary")}>
               v{v.number} · {v.originalName}
               {v.current && <span className="badge ms-1">{doc.status === "live" ? "Live" : "Current"}</span>}
+              {v.uploadedVia && <span className="block text-sm text-text-muted">via {v.uploadedVia}</span>}
             </span>
             <span className="flex flex-none items-center gap-1 text-sm text-text-muted">
               {formatDay(v.createdAt)}
